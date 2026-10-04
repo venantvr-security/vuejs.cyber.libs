@@ -15,7 +15,7 @@
       <p class="text-xs text-slate-300 leading-relaxed">
         {{ termData.shortDef || termData.definition }}
       </p>
-      <div v-if="termData.category" class="mt-2 text-[10px] text-slate-500 uppercase tracking-wider font-bold">
+      <div v-if="termData.category" class="mt-2 text-xs text-slate-500 uppercase tracking-wider font-bold">
         Catégorie: {{ termData.category }}
       </div>
     </div>
