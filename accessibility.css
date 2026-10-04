@@ -8,7 +8,7 @@
   Default is usually 16px (100%). We bump it to 18px (112.5%).
 */
 html {
-  font-size: 18px; /* 1rem = 18px */
+  font-size: 16px; /* 1rem = 18px */
   -webkit-text-size-adjust: 100%;
 }
 
