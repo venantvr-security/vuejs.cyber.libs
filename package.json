@@ -1,0 +1,17 @@
+{
+  "name": "vuejs.cyber.libs",
+  "version": "1.0.0",
+  "description": "Shared library for Cyber and CTI Nexus (visuals, roles, engines, services)",
+  "main": "index.js",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/venantvr-security/vuejs.cyber.libs.git"
+  },
+  "dependencies": {
+    "jsonrepair": "^3.15.0"
+  },
+  "peerDependencies": {
+    "vue": "^3.0.0"
+  }
+}
