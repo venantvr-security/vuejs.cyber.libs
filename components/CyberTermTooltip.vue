@@ -2,6 +2,7 @@
   <Teleport to="body">
     <div 
       ref="tooltipRef"
+      role="tooltip"
       v-if="isVisible && termData"
       class="fixed z-[9999] p-4 w-72 rounded-xl bg-slate-900 border border-cyan-500 shadow-[0_0_15px_rgba(34,211,238,0.3)] transition-opacity duration-300 pointer-events-none"
       :style="{ left: position.x + 'px', top: position.y + 'px', opacity: isCalculated ? 1 : 0 }"
@@ -15,8 +16,8 @@
       <p class="text-xs text-slate-300 leading-relaxed">
         {{ termData.shortDef || termData.definition }}
       </p>
-      <div v-if="termData.category" class="mt-2 text-xs text-slate-500 uppercase tracking-wider font-bold">
-        Catégorie: {{ termData.category }}
+      <div v-if="termData.category" class="mt-2 text-xs text-slate-400 uppercase tracking-wider font-bold">
+        {{ categoryLabel ? `${categoryLabel} : ` : '' }}{{ termData.category }}
       </div>
     </div>
   </Teleport>
@@ -24,6 +25,11 @@
 
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
+
+defineProps({
+  // Libellé traduit fourni par l'application (aucun texte en dur dans la lib)
+  categoryLabel: { type: String, default: '' }
+})
 
 const isVisible = ref(false)
 const isCalculated = ref(false)
