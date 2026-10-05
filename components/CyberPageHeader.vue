@@ -11,7 +11,8 @@
     ></div>
 
     <div class="relative flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-      <div class="min-w-0">
+      <!-- Colonne texte prioritaire : largeur minimale pour éviter un chapeau mot à mot -->
+      <div class="min-w-0 xl:flex-1 xl:min-w-[24rem]">
         <div v-if="$slots.eyebrow" class="flex flex-wrap items-center gap-2 mb-2">
           <slot name="eyebrow"></slot>
         </div>
@@ -39,7 +40,7 @@
         </div>
       </div>
 
-      <div v-if="$slots.actions" class="flex flex-wrap gap-2 shrink-0">
+      <div v-if="$slots.actions" class="flex flex-wrap items-center gap-2 min-w-0 xl:justify-end xl:max-w-[55%]">
         <slot name="actions"></slot>
       </div>
     </div>
