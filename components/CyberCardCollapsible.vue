@@ -10,7 +10,7 @@
         <button
           type="button"
           class="mt-0.5 p-1.5 rounded-lg bg-slate-800/80 text-slate-300 hover:text-white transition-colors shrink-0"
-          :title="collapsed ? t('cyber_card_expand', 'Déplier') : t('cyber_card_collapse', 'Replier')"
+          :title="collapsed ? t('cyber_card_expand') : t('cyber_card_collapse')"
         >
           <svg v-if="!collapsed" class="w-4 h-4 text-cyan-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
           <svg v-else class="w-4 h-4 text-slate-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>

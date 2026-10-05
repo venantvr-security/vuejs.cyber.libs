@@ -60,7 +60,7 @@ const moodColor = computed(() => {
           v-if="isTtsSupported"
           @click="playVoice(`actor-quote-${actor.id}`, currentPreset.sampleQuote, actor.id)"
           class="p-1.5 rounded-lg bg-slate-800/80 hover:bg-cyan-500/20 text-slate-400 hover:text-cyan-300 border border-slate-700/80 hover:border-cyan-500/40 transition-colors shrink-0"
-          :title="currentlySpeakingId === `actor-quote-${actor.id}` ? t('ac_stop_audio', 'Arrêter') : t('ac_play_audio', 'Écouter')"
+          :title="currentlySpeakingId === `actor-quote-${actor.id}` ? t('ac_stop_audio') : t('ac_play_audio')"
         >
           <VolumeX v-if="currentlySpeakingId === `actor-quote-${actor.id}`" class="w-4 h-4 text-rose-400 animate-pulse" />
           <Volume2 v-else class="w-4 h-4" />
@@ -70,8 +70,8 @@ const moodColor = computed(() => {
       <!-- Preset Selector (3 Presets: Coopératif, Exigeant, Très Hostile) -->
       <div>
         <label class="text-xs uppercase  tracking-wider text-slate-400 mb-1.5 flex items-center justify-between gap-2">
-          <span>{{ t('ac_temperament', 'Tempérament') }}</span>
-          <span class="text-xs font-sans normal-case tracking-normal text-slate-400 truncate">{{ t('ac_click_force', '(Clic pour forcer)') }}</span>
+          <span>{{ t('ac_temperament') }}</span>
+          <span class="text-xs font-sans normal-case tracking-normal text-slate-400 truncate">{{ t('ac_click_force') }}</span>
         </label>
         <div class="grid grid-cols-3 gap-1 p-1 bg-slate-900/90 rounded-lg border border-slate-800">
           <!-- Preset 1: Coopératif -->
@@ -79,10 +79,10 @@ const moodColor = computed(() => {
             @click="$emit('changePreset', { actorId: actor.id, preset: 'cooperative' })"
             :class="actor.activePreset === 'cooperative' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-sm font-semibold' : 'text-slate-400 hover:text-slate-200 border-transparent hover:bg-slate-800/60'"
             class="flex flex-col items-center justify-center gap-1 py-2 px-1 rounded-md border text-sm leading-tight text-center transition-all min-w-0"
-            :title="t('ac_coop', 'Coopératif')"
+            :title="t('ac_coop')"
           >
             <HeartHandshake class="w-4 h-4 text-emerald-400 shrink-0" />
-            <span class="break-words hyphens-auto w-full">{{ t('ac_coop', 'Coopératif') }}</span>
+            <span class="break-words hyphens-auto w-full">{{ t('ac_coop') }}</span>
           </button>
 
           <!-- Preset 2: Exigeant / Neutre -->
@@ -90,10 +90,10 @@ const moodColor = computed(() => {
             @click="$emit('changePreset', { actorId: actor.id, preset: 'demanding' })"
             :class="actor.activePreset === 'demanding' ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm font-semibold' : 'text-slate-400 hover:text-slate-200 border-transparent hover:bg-slate-800/60'"
             class="flex flex-col items-center justify-center gap-1 py-2 px-1 rounded-md border text-sm leading-tight text-center transition-all min-w-0"
-            :title="t('ac_demanding', 'Exigeant')"
+            :title="t('ac_demanding')"
           >
             <ShieldAlert class="w-4 h-4 text-amber-400 shrink-0" />
-            <span class="break-words hyphens-auto w-full">{{ t('ac_demanding', 'Exigeant') }}</span>
+            <span class="break-words hyphens-auto w-full">{{ t('ac_demanding') }}</span>
           </button>
 
           <!-- Preset 3: Très Hostile / Toxique -->
@@ -101,10 +101,10 @@ const moodColor = computed(() => {
             @click="$emit('changePreset', { actorId: actor.id, preset: 'hostile' })"
             :class="actor.activePreset === 'hostile' ? 'bg-rose-500/25 text-rose-300 border-rose-500/60 shadow-glow-danger font-bold' : 'text-slate-400 hover:text-slate-200 border-transparent hover:bg-slate-800/60'"
             class="flex flex-col items-center justify-center gap-1 py-2 px-1 rounded-md border text-sm leading-tight text-center transition-all min-w-0"
-            :title="t('ac_hostile', 'Hostile')"
+            :title="t('ac_hostile')"
           >
             <Flame class="w-4 h-4 text-rose-400 shrink-0" />
-            <span class="break-words hyphens-auto w-full">{{ t('ac_hostile', 'Hostile') }}</span>
+            <span class="break-words hyphens-auto w-full">{{ t('ac_hostile') }}</span>
           </button>
         </div>
       </div>
@@ -117,7 +117,7 @@ const moodColor = computed(() => {
           @click="showDetails = !showDetails"
           class="w-full flex items-center gap-2 text-sm font-semibold text-slate-100 hover:text-cyan-300 transition-colors text-left"
           :aria-expanded="showDetails"
-          :title="t('ac_fold', 'Déplier/Replier')"
+          :title="t('ac_fold')"
         >
           <Sparkles class="w-4 h-4 text-cyan-400 shrink-0" />
           <span class="truncate flex-1">{{ currentPreset.name }}</span>
@@ -144,7 +144,7 @@ const moodColor = computed(() => {
               v-if="isTtsSupported"
               @click.stop="playVoice(`actor-quote-${actor.id}`, currentPreset.sampleQuote, actor.id)"
               class="p-1 rounded hover:bg-cyan-500/20 text-cyan-300 hover:text-cyan-100 transition-colors shrink-0"
-              :title="currentlySpeakingId === `actor-quote-${actor.id}` ? t('ac_stop_audio', 'Arrêter') : t('ac_play_audio', 'Écouter')"
+              :title="currentlySpeakingId === `actor-quote-${actor.id}` ? t('ac_stop_audio') : t('ac_play_audio')"
             >
               <VolumeX v-if="currentlySpeakingId === `actor-quote-${actor.id}`" class="w-3.5 h-3.5 text-rose-300 animate-pulse" />
               <Volume2 v-else class="w-3.5 h-3.5" />
@@ -159,30 +159,30 @@ const moodColor = computed(() => {
       <div class="flex items-center justify-between text-xs  text-slate-400">
         <span class="flex items-center gap-1 text-cyan-300 font-semibold">
           <Activity class="w-3 h-3 text-cyan-400" />
-          <span>{{ t('ac_psychology', 'État Psychologique') }}</span>
+          <span>{{ t('ac_psychology') }}</span>
         </span>
       </div>
       <div class="grid grid-cols-2 gap-1.5 text-xs ">
         <div class="flex items-center justify-between bg-slate-950/70 px-2 py-1 rounded border border-slate-800/90">
-          <span class="text-slate-400">{{ t('ac_annoyance', 'Agacement') }}</span>
+          <span class="text-slate-400">{{ t('ac_annoyance') }}</span>
           <span class="font-bold" :class="actor.psychology.agacement >= 4 ? 'text-rose-400' : actor.psychology.agacement >= 3 ? 'text-amber-400' : 'text-emerald-400'">
             {{ actor.psychology.agacement }}/5
           </span>
         </div>
         <div class="flex items-center justify-between bg-slate-950/70 px-2 py-1 rounded border border-slate-800/90">
-          <span class="text-slate-400">{{ t('ac_trust', 'Confiance') }}</span>
+          <span class="text-slate-400">{{ t('ac_trust') }}</span>
           <span class="font-bold" :class="actor.psychology.confiance >= 4 ? 'text-emerald-400' : actor.psychology.confiance >= 2 ? 'text-amber-400' : 'text-rose-400'">
             {{ actor.psychology.confiance }}/5
           </span>
         </div>
         <div class="flex items-center justify-between bg-slate-950/70 px-2 py-1 rounded border border-slate-800/90">
-          <span class="text-slate-400">{{ t('ac_stress', 'Stress') }}</span>
+          <span class="text-slate-400">{{ t('ac_stress') }}</span>
           <span class="font-bold" :class="actor.psychology.stress >= 4 ? 'text-rose-400' : actor.psychology.stress >= 3 ? 'text-amber-400' : 'text-emerald-400'">
             {{ actor.psychology.stress }}/5
           </span>
         </div>
         <div class="flex items-center justify-between bg-slate-950/70 px-2 py-1 rounded border border-slate-800/90">
-          <span class="text-slate-400">{{ t('ac_openness', 'Ouverture') }}</span>
+          <span class="text-slate-400">{{ t('ac_openness') }}</span>
           <span class="font-bold" :class="actor.psychology.ouverture >= 4 ? 'text-emerald-400' : actor.psychology.ouverture >= 2 ? 'text-amber-400' : 'text-rose-400'">
             {{ actor.psychology.ouverture }}/5
           </span>
@@ -192,9 +192,9 @@ const moodColor = computed(() => {
 
     <!-- Patience Indicator -->
     <div class="flex items-center justify-between gap-2 text-xs text-slate-400  mt-auto pt-2 border-t border-slate-800/80">
-      <span>{{ t('ac_patience', 'Patience Globale') }}</span>
+      <span>{{ t('ac_patience') }}</span>
       <span :class="actor.activePreset === 'cooperative' ? 'text-emerald-400 font-semibold' : actor.activePreset === 'demanding' ? 'text-amber-400 font-semibold' : 'text-rose-400 font-bold'">
-        {{ actor.activePreset === 'cooperative' ? t('ac_status_coop', 'Coopérative') : actor.activePreset === 'demanding' ? t('ac_status_demanding', 'Sous tension') : t('ac_status_hostile', 'Rupture') }}
+        {{ actor.activePreset === 'cooperative' ? t('ac_status_coop') : actor.activePreset === 'demanding' ? t('ac_status_demanding') : t('ac_status_hostile') }}
       </span>
     </div>
   </div>

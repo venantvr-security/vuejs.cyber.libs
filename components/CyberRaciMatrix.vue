@@ -10,7 +10,7 @@
           v-model="selectedRole"
           class="bg-slate-950 border border-slate-700 text-slate-200 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2 max-w-xs"
         >
-          <option value="ALL">{{ t('cyber_raci_all', 'Tous les rôles (Vue complète)') }}</option>
+          <option value="ALL">{{ t('cyber_raci_all') }}</option>
           <option v-for="role in roles" :key="role.key" :value="role.key">
             {{ role.label }}
           </option>
@@ -19,25 +19,25 @@
 
       <!-- RACI Letter Checkboxes -->
       <div class="flex items-center gap-3 bg-slate-950/80 p-2 rounded-lg border border-slate-800/80 overflow-x-auto">
-        <span class="text-xs text-slate-400 font-bold px-1 whitespace-nowrap">{{ t('cyber_raci_show', 'AFFICHER :') }}</span>
+        <span class="text-xs text-slate-400 font-bold px-1 whitespace-nowrap">{{ t('cyber_raci_show') }}</span>
         <label class="flex items-center gap-2 cursor-pointer group whitespace-nowrap">
           <input type="checkbox" v-model="filters.R" class="rounded border-slate-600 text-cyan-500 focus:ring-cyan-500/30 bg-slate-800 w-4 h-4 cursor-pointer">
-          <span class="text-sm font-bold text-slate-300 group-hover:text-cyan-300 transition-colors">R <span class="hidden sm:inline font-normal text-xs text-slate-400">{{ t('cyber_raci_r', '(Réalisateur)') }}</span></span>
+          <span class="text-sm font-bold text-slate-300 group-hover:text-cyan-300 transition-colors">R <span class="hidden sm:inline font-normal text-xs text-slate-400">{{ t('cyber_raci_r') }}</span></span>
         </label>
         <div class="w-px h-4 bg-slate-700"></div>
         <label class="flex items-center gap-2 cursor-pointer group whitespace-nowrap">
           <input type="checkbox" v-model="filters.A" class="rounded border-slate-600 text-rose-500 focus:ring-rose-500/30 bg-slate-800 w-4 h-4 cursor-pointer">
-          <span class="text-sm font-bold text-slate-300 group-hover:text-rose-300 transition-colors">A <span class="hidden sm:inline font-normal text-xs text-slate-400">{{ t('cyber_raci_a', '(Approbateur)') }}</span></span>
+          <span class="text-sm font-bold text-slate-300 group-hover:text-rose-300 transition-colors">A <span class="hidden sm:inline font-normal text-xs text-slate-400">{{ t('cyber_raci_a') }}</span></span>
         </label>
         <div class="w-px h-4 bg-slate-700"></div>
         <label class="flex items-center gap-2 cursor-pointer group whitespace-nowrap">
           <input type="checkbox" v-model="filters.C" class="rounded border-slate-600 text-amber-500 focus:ring-amber-500/30 bg-slate-800 w-4 h-4 cursor-pointer">
-          <span class="text-sm font-bold text-slate-300 group-hover:text-amber-300 transition-colors">C <span class="hidden sm:inline font-normal text-xs text-slate-400">{{ t('cyber_raci_c', '(Consulté)') }}</span></span>
+          <span class="text-sm font-bold text-slate-300 group-hover:text-amber-300 transition-colors">C <span class="hidden sm:inline font-normal text-xs text-slate-400">{{ t('cyber_raci_c') }}</span></span>
         </label>
         <div class="w-px h-4 bg-slate-700"></div>
         <label class="flex items-center gap-2 cursor-pointer group whitespace-nowrap">
           <input type="checkbox" v-model="filters.I" class="rounded border-slate-600 text-slate-400 focus:ring-slate-400/30 bg-slate-800 w-4 h-4 cursor-pointer">
-          <span class="text-sm font-bold text-slate-300 group-hover:text-slate-100 transition-colors">I <span class="hidden sm:inline font-normal text-xs text-slate-400">{{ t('cyber_raci_i', '(Informé)') }}</span></span>
+          <span class="text-sm font-bold text-slate-300 group-hover:text-slate-100 transition-colors">I <span class="hidden sm:inline font-normal text-xs text-slate-400">{{ t('cyber_raci_i') }}</span></span>
         </label>
       </div>
     </div>
@@ -107,7 +107,7 @@
           </tr>
           <tr v-if="filteredData.length === 0">
             <td :colspan="selectedRole === 'ALL' ? roles.length + 2 : 3" class="py-6 text-center text-slate-400 text-xs">
-              {{ t('cyber_raci_empty', 'Aucune activité ne correspond aux filtres.') }}
+              {{ t('cyber_raci_empty') }}
             </td>
           </tr>
         </tbody>
@@ -117,11 +117,11 @@
     <!-- Legend -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-400 pt-1">
       <div class="flex items-center gap-3 flex-wrap">
-        <span>{{ t('cyber_raci_legend', 'Légende :') }}</span>
-        <span class="text-cyan-300 font-bold flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-cyan-400"></span>{{ t('cyber_raci_leg_r', 'R = Réalisateur') }}</span>
-        <span class="text-rose-300 font-bold flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-rose-400"></span>{{ t('cyber_raci_leg_a', 'A = Approbateur') }}</span>
-        <span class="text-amber-300 flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span>{{ t('cyber_raci_leg_c', 'C = Consulté') }}</span>
-        <span class="text-slate-400 flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-slate-500"></span>{{ t('cyber_raci_leg_i', 'I = Informé') }}</span>
+        <span>{{ t('cyber_raci_legend') }}</span>
+        <span class="text-cyan-300 font-bold flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-cyan-400"></span>{{ t('cyber_raci_leg_r') }}</span>
+        <span class="text-rose-300 font-bold flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-rose-400"></span>{{ t('cyber_raci_leg_a') }}</span>
+        <span class="text-amber-300 flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span>{{ t('cyber_raci_leg_c') }}</span>
+        <span class="text-slate-400 flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-slate-500"></span>{{ t('cyber_raci_leg_i') }}</span>
       </div>
       <div>
         <span class="font-bold text-cyan-300">{{ filteredData.length }}</span> / {{ data.length }} affichées
