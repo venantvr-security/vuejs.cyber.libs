@@ -12,6 +12,7 @@
     "jsonrepair": "^3.15.0"
   },
   "peerDependencies": {
+    "tailwindcss": "^3.4.19",
     "vue": "^3.0.0"
   }
 }
