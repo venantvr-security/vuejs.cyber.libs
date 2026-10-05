@@ -9,7 +9,8 @@
     "url": "git+https://github.com/venantvr-security/vuejs.cyber.libs.git"
   },
   "dependencies": {
-    "jsonrepair": "^3.15.0"
+    "jsonrepair": "^3.15.0",
+    "lucide-vue-next": "^1.0.0"
   },
   "peerDependencies": {
     "tailwindcss": "^3.4.19",
