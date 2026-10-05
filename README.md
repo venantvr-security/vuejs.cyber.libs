@@ -85,6 +85,9 @@ Aucun texte n'est codé en dur : tout passe par props et slots (les applications
 - `components/CyberVoiceButton.vue` : lecture / arrêt de synthèse vocale (`speechId`, `text`, `voice`, `playLabel`, `stopLabel`, `showLabel`, `size`) ; masqué si le navigateur ne la supporte pas.
 - `components/CyberDictationButton.vue` : bouton micro de dictée (`listening`, `supported`, `startLabel`, `stopLabel`, `unsupportedLabel`, `showLabel`) ; émet `toggle`.
 - `components/CyberInlineAlert.vue` : message d'erreur en ligne (`role="alert"`, `tone`, `dismissLabel`) ; émet `dismiss`.
+- `components/CyberSegmented.vue` : choix unique (contrôle segmenté `variant="seg"` ou puces `variant="chip"`, `scroll` pour un rail) avec sémantique radiogroup et navigation aux flèches ; `options` (`value`, `label`, `icon`, `title`, `count`, `disabled`, `class`, `activeClass`) ; `v-model` ; slot `option`.
+- `components/CyberStatTile.vue` : tuile de chiffre clé (`accent`, `variant` `card` | `inset`) ; slots `label`, défaut (valeur), `hint`, `icon`.
+- `components/CyberEmptyState.vue` : état vide (`compact`) ; slots `icon`, `title`, défaut (message), `actions`.
 - `components/CyberScrollRail.vue` : barre horizontale défilante pour les menus larges. Des contrôles apparaissent à gauche et à droite quand du contenu est masqué : survol = défilement continu, clic = une page ; molette verticale convertie en horizontal ; l'élément actif (`aria-current="page"`, `.cn-tab-active`…) est ramené dans la vue. Props : `track-class` (gap/alignement de la piste), `fade-class` (dégradé accordé au fond, ex. `from-slate-800 via-slate-800/80 to-transparent` dans une modale), `speed` (px/s), `wheel`.
 - `components/CyberAccordion.vue` : accordéon `<details>`.
 - `components/CyberTermTooltip.vue` : infobulle du lexique au survol.
