@@ -78,6 +78,7 @@ Aucun texte n'est codé en dur : tout passe par props et slots (les applications
 
 - `components/CyberModal.vue` : coque de modale (fond, panneau, en-tête, fermeture Échap/clic, pied).
 - `components/CyberPageHeader.vue` : en-tête de vue (pastille, icône, titre, chapeau, actions).
+- `components/CyberScrollRail.vue` : barre horizontale défilante pour les menus larges. Des contrôles apparaissent à gauche et à droite quand du contenu est masqué : survol = défilement continu, clic = une page ; molette verticale convertie en horizontal ; l'élément actif (`aria-current="page"`, `.cn-tab-active`…) est ramené dans la vue. Props : `track-class` (gap/alignement de la piste), `fade-class` (dégradé accordé au fond, ex. `from-slate-800 via-slate-800/80 to-transparent` dans une modale), `speed` (px/s), `wheel`.
 - `components/CyberAccordion.vue` : accordéon `<details>`.
 - `components/CyberTermTooltip.vue` : infobulle du lexique au survol.
 
