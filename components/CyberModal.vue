@@ -115,6 +115,10 @@ const ACCENTS = {
     border: 'border-violet-500/40',
     tile: 'bg-violet-500/10 border-violet-500/30 text-violet-400'
   },
+  blue: {
+    border: 'border-blue-500/40',
+    tile: 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+  },
   purple: {
     border: 'border-purple-500/40',
     tile: 'bg-purple-500/10 border-purple-500/30 text-purple-400'
