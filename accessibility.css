@@ -1,42 +1,29 @@
-/* vue.cyber.visuals/accessibility.css */
+/* Accessibilité & socle typographique partagés (CSS pur, importable hors Tailwind) */
 
-/* 
-  Global Accessibility Overrides
-  Increases the base font size for the whole application.
-  Since Tailwind uses 'rem' units for text sizing, padding, and margins,
-  increasing the root font size scales up the entire UI proportionally.
-  Default is usually 16px (100%). We bump it to 18px (112.5%).
-*/
 html {
-  font-size: 16px; /* 1rem = 18px */
+  font-size: 16px;
   -webkit-text-size-adjust: 100%;
 }
 
-/* Improve global line-height for better readability */
 body {
   line-height: 1.6;
+  font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Improve contrast for text selection */
 ::selection {
-  background-color: rgba(6, 182, 212, 0.4); /* Cyan-500 with opacity */
+  background-color: rgba(6, 182, 212, 0.4);
   color: #fff;
 }
 
-/* Base focus outline for accessibility */
 *:focus-visible {
   outline: 2px solid #06b6d4;
   outline-offset: 2px;
 }
 
-/* 
-  Global Layout Class
-  Enforces a 90% width container on desktop screens for better readability 
-  and screen usage across Nexus applications.
-*/
+/* Conteneur global : 90 % de la largeur sur desktop */
 .cyber-container {
   width: 100%;
   margin-left: auto;

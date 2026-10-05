@@ -1,0 +1,7 @@
+/* Point d'entrée des styles partagés : à importer AVANT les directives @tailwind */
+@import './tokens.css';
+@import '../accessibility.css';
+@import './base.css';
+@import './components.css';
+@import './animations.css';
+@import './theme-light.css';

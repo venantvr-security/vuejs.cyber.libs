@@ -1,0 +1,144 @@
+/* ==========================================================================
+   CYBER-NEXUS : Thème Mode Jour (« Clean Enterprise »)
+   Activé via la classe .light sur l'élément <html>
+
+   Les palettes slate / cyan / emerald / amber / rose / purple / violet / blue /
+   indigo sont inversées par variables CSS (voir tailwind.config.js) : toutes
+   les classes Tailwind correspondantes (opacités, dégradés, hover) basculent
+   automatiquement. Ce fichier ne traite que ce qui échappe à la palette :
+   couleurs hexadécimales arbitraires, glassmorphism, blanc/noir, formulaires.
+   ========================================================================== */
+
+html.light {
+  color-scheme: light;
+
+  --color-bg-base: #f8fafc;
+  --color-bg-surface: #ffffff;
+  --color-bg-card: rgba(255, 255, 255, 0.96);
+  --color-border-subtle: #e2e8f0;
+  --color-border-active: rgba(8, 145, 178, 0.45);
+
+  --color-cyber-cyan: #0891b2;
+  --color-cyber-emerald: #059669;
+  --color-cyber-amber: #d97706;
+  --color-cyber-rose: #e11d48;
+  --color-cyber-violet: #7c3aed;
+
+  --shadow-glow-cyan: 0 4px 20px -3px rgba(8, 145, 178, 0.18);
+  --shadow-glow-danger: 0 4px 20px -3px rgba(225, 29, 72, 0.18);
+  --shadow-glow-amber: 0 4px 20px -3px rgba(217, 119, 6, 0.18);
+  --shadow-glow-emerald: 0 4px 20px -3px rgba(5, 150, 105, 0.18);
+}
+
+/* Base Body & App Container */
+html.light body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  background-image:
+    radial-gradient(circle at 15% 15%, rgba(6, 182, 212, 0.05) 0%, transparent 40%),
+    radial-gradient(circle at 85% 85%, rgba(139, 92, 246, 0.04) 0%, transparent 40%),
+    linear-gradient(to bottom, #f8fafc, #f1f5f9) !important;
+}
+
+/* Glass Panels */
+html.light .glass-panel {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.05), 0 1px 2px -1px rgba(15, 23, 42, 0.04) !important;
+}
+
+html.light .glass-panel-elevated {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08) !important;
+}
+
+html.light .glass-panel-subtle {
+  background: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Fonds hexadécimaux arbitraires (hors palette) */
+html.light .bg-\[\#070b14\],
+html.light .bg-\[\#070b14\]\/95,
+html.light .bg-\[\#0a1122\],
+html.light .bg-\[\#090f1d\] {
+  background-color: #ffffff !important;
+}
+
+/* Volet théorique : surface légèrement teintée pour se détacher du contenu */
+html.light .bg-\[\#090d1a\]\/95 {
+  background-color: rgba(241, 245, 249, 0.96) !important;
+}
+
+html.light .from-\[\#0c1427\] { --tw-gradient-from: #ffffff var(--tw-gradient-from-position) !important; --tw-gradient-to: rgb(255 255 255 / 0) var(--tw-gradient-to-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important; }
+html.light .via-\[\#091124\] { --tw-gradient-stops: var(--tw-gradient-from), #f8fafc var(--tw-gradient-via-position), var(--tw-gradient-to) !important; }
+html.light .to-\[\#0d162d\] { --tw-gradient-to: #ecfeff var(--tw-gradient-to-position) !important; }
+
+/* Texte blanc -> encre, sauf sur les boutons pleins colorés */
+html.light .text-white:not([class~="bg-purple-500"]):not([class~="bg-purple-600"]):not([class~="bg-cyan-500"]):not([class~="bg-cyan-600"]):not([class~="bg-emerald-500"]):not([class~="bg-emerald-600"]):not([class~="bg-rose-500"]):not([class~="bg-rose-600"]):not([class~="bg-blue-600"]),
+html.light .hover\:text-white:hover {
+  color: #0f172a !important;
+}
+
+/* Boutons pleins : le survol 400 (mappé sur une teinte foncée) reste vif */
+html.light .hover\:bg-cyan-400:hover { background-color: rgb(34 211 238) !important; }
+html.light .hover\:bg-emerald-400:hover { background-color: rgb(52 211 153) !important; }
+html.light .hover\:bg-amber-400:hover { background-color: rgb(251 191 36) !important; }
+html.light .hover\:bg-rose-400:hover { background-color: rgb(251 113 133) !important; }
+html.light .hover\:bg-purple-400:hover { background-color: rgb(192 132 252) !important; }
+
+/* Logo Brand Text Gradient */
+html.light .bg-gradient-to-r.from-white {
+  background-image: linear-gradient(to right, #0f172a, #0891b2, #1d4ed8) !important;
+}
+
+/* Ombres portées sombres adoucies */
+html.light .shadow-black\/60,
+html.light .shadow-2xl {
+  --tw-shadow-color: rgba(15, 23, 42, 0.12) !important;
+}
+
+/* Inputs, Textareas, Selects */
+html.light input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+html.light textarea,
+html.light select {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
+html.light textarea:focus,
+html.light select:focus {
+  border-color: #0891b2 !important;
+  box-shadow: 0 0 0 2px rgba(8, 145, 178, 0.15) !important;
+}
+
+html.light ::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Modals & Backdrops */
+html.light .bg-black\/60,
+html.light .bg-black\/70,
+html.light .bg-black\/80 {
+  background-color: rgba(15, 23, 42, 0.45) !important;
+}
+
+/* Scrollbars in Light Mode */
+html.light ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+html.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Actors Rail Cards in Light Mode */
+html.light .actors-rail > * {
+  box-shadow: 0 2px 8px -2px rgba(15, 23, 42, 0.06) !important;
+}

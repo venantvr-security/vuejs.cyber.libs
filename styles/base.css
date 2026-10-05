@@ -1,0 +1,27 @@
+/* Socle Tailwind partagé : fond, titres, chiffres (nécessite les directives @tailwind) */
+
+@layer base {
+  body {
+    @apply bg-[#070b14] text-slate-100 font-sans antialiased;
+    background-image:
+      radial-gradient(circle at 15% 15%, rgba(6, 182, 212, 0.08) 0%, transparent 40%),
+      radial-gradient(circle at 85% 85%, rgba(139, 92, 246, 0.06) 0%, transparent 40%),
+      linear-gradient(to bottom, #070b14, #0b1120);
+    background-attachment: fixed;
+  }
+
+  /* Titres : approche resserrée d'Inter aux grandes tailles, retours à la ligne équilibrés */
+  h1, h2, h3, h4, .font-heading {
+    letter-spacing: -0.011em;
+    text-wrap: balance;
+  }
+
+  p, li, dd, blockquote {
+    text-wrap: pretty;
+  }
+
+  /* Chiffres alignés dans les jauges, tableaux et compteurs */
+  table, progress, meter, output {
+    font-variant-numeric: tabular-nums;
+  }
+}
