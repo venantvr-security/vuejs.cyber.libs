@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { Sparkles, HeartHandshake, ShieldAlert, Flame, ChevronDown, Activity, Volume2, VolumeX } from 'lucide-vue-next'
-import { useVoiceSynthesis } from '../services/voiceService.js'
+import { Sparkles, HeartHandshake, ShieldAlert, Flame, ChevronDown, Activity } from 'lucide-vue-next'
+import CyberVoiceButton from './CyberVoiceButton.vue'
 
 const props = defineProps({
   actor: {
@@ -38,7 +38,6 @@ function gaugeClass(gauge, value) {
   return value >= 4 ? 'text-emerald-400' : value >= 2 ? 'text-amber-400' : 'text-rose-400'
 }
 
-const { currentlySpeakingId, play: playVoice, isSupported: isTtsSupported } = useVoiceSynthesis()
 
 // État purement visuel : dépliage du détail du preset
 const showDetails = ref(false)
@@ -76,17 +75,15 @@ const moodColor = computed(() => {
           </div>
         </div>
 
-        <button
-          v-if="isTtsSupported"
-          type="button"
-          :aria-label="currentlySpeakingId === `actor-quote-${actor.id}` ? t('ac_stop_audio') : t('ac_play_audio')"
-          @click="playVoice(`actor-quote-${actor.id}`, currentPreset.sampleQuote, actor.id)"
-          class="p-1.5 rounded-lg bg-slate-800/80 hover:bg-cyan-500/20 text-slate-400 hover:text-cyan-300 border border-slate-700/80 hover:border-cyan-500/40 transition-colors shrink-0"
-          :title="currentlySpeakingId === `actor-quote-${actor.id}` ? t('ac_stop_audio') : t('ac_play_audio')"
-        >
-          <VolumeX v-if="currentlySpeakingId === `actor-quote-${actor.id}`" class="w-4 h-4 text-rose-400 animate-pulse" />
-          <Volume2 v-else class="w-4 h-4" />
-        </button>
+        <CyberVoiceButton
+          :speech-id="`actor-quote-${actor.id}`"
+          :text="currentPreset.sampleQuote"
+          :voice="actor.id"
+          :play-label="t('ac_play_audio')"
+          :stop-label="t('ac_stop_audio')"
+          size="md"
+          class="p-1.5 rounded-lg bg-slate-800/80 hover:bg-cyan-500/20 text-slate-400 hover:text-cyan-300 border border-slate-700/80 hover:border-cyan-500/40"
+        />
       </div>
 
       <!-- Preset Selector (3 Presets: Coopératif, Exigeant, Très Hostile) -->
@@ -143,17 +140,14 @@ const moodColor = computed(() => {
 
           <div class="text-sm italic text-slate-200 border-l-2 border-cyan-500/60 pl-3 bg-cyan-950/25 py-1.5 rounded-r leading-relaxed flex items-center justify-between gap-2">
             <span>{{ currentPreset.sampleQuote }}</span>
-            <button
-              v-if="isTtsSupported"
-              type="button"
-              :aria-label="currentlySpeakingId === `actor-quote-${actor.id}` ? t('ac_stop_audio') : t('ac_play_audio')"
-              @click.stop="playVoice(`actor-quote-${actor.id}`, currentPreset.sampleQuote, actor.id)"
-              class="p-1 rounded hover:bg-cyan-500/20 text-cyan-300 hover:text-cyan-100 transition-colors shrink-0"
-              :title="currentlySpeakingId === `actor-quote-${actor.id}` ? t('ac_stop_audio') : t('ac_play_audio')"
-            >
-              <VolumeX v-if="currentlySpeakingId === `actor-quote-${actor.id}`" class="w-3.5 h-3.5 text-rose-300 animate-pulse" />
-              <Volume2 v-else class="w-3.5 h-3.5" />
-            </button>
+            <CyberVoiceButton
+              :speech-id="`actor-quote-${actor.id}`"
+              :text="currentPreset.sampleQuote"
+              :voice="actor.id"
+              :play-label="t('ac_play_audio')"
+              :stop-label="t('ac_stop_audio')"
+              class="p-1 rounded hover:bg-cyan-500/20 text-cyan-300 hover:text-cyan-100"
+            />
           </div>
         </div>
       </div>

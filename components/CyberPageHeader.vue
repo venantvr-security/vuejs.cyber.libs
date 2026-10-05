@@ -25,9 +25,9 @@
           >
             <slot name="icon"></slot>
           </div>
-          <h1 class="font-heading text-xl sm:text-2xl font-bold tracking-tight text-slate-50 min-w-0">
+          <component :is="as" class="font-heading text-xl sm:text-2xl font-bold tracking-tight text-slate-50 min-w-0">
             <slot name="title"></slot>
-          </h1>
+          </component>
         </div>
 
         <p v-if="$slots.lead" class="text-sm text-slate-300 leading-relaxed max-w-3xl mt-1.5">
@@ -54,6 +54,12 @@
 import { computed } from 'vue'
 
 const props = defineProps({
+  // Niveau de titre : h1 par défaut, h2 quand l'application porte déjà un h1
+  as: {
+    type: String,
+    default: 'h1',
+    validator: (v) => ['h1', 'h2', 'h3'].includes(v)
+  },
   accent: {
     type: String,
     default: 'cyan',
