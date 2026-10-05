@@ -164,31 +164,7 @@ const currentRoleLabel = computed(() => {
 })
 
 const filteredData = computed(() => {
-  return props.data.filter(row => {
-    // Si aucun filtre de lettre n'est actif pour une ligne, est-ce qu'on la cache ?
-    // "les cases se vident mais la structure ne bouge pas" => on affiche toujours toutes les lignes
-    // SI ET SEULEMENT SI le filtre de rôle n'est pas "ALL" et qu'on veut cacher les lignes sans pertinence.
-    // Mais s'il est ALL, affiche-t-on la ligne si aucune case de la ligne n'est cochée pour n'importe quel rôle ?
-    if (selectedRole.value !== 'ALL') {
-      const letter = row[selectedRole.value]
-      if (!letter || !filters.value[letter]) return false
-    } else {
-      // En mode ALL, on affiche la ligne s'il reste au moins un rôle avec une lettre active
-      // OU on affiche TOUTES les lignes et seules les cases se vident ?
-      // Dans Cyber Nexus, en mode ALL, les cases se vident et la ligne reste visible sauf si on décoche toutes les lettres.
-      // Par sécurité, on garde la logique "si au moins une lettre de la ligne matche les filtres actifs"
-      let hasVisible = false
-      for (const r of props.roles) {
-        const letter = row[r.key]
-        if (letter && filters.value[letter]) {
-          hasVisible = true
-          break
-        }
-      }
-      if (!hasVisible) return false
-    }
-    return true
-  })
+  return props.data
 })
 
 function getBadgeClass(letter) {
