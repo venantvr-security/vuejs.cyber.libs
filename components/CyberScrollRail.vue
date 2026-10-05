@@ -47,7 +47,7 @@ const props = defineProps({
   // Molette verticale convertie en défilement horizontal quand la piste déborde
   wheel: { type: Boolean, default: true },
   // Élément actif à garder visible
-  activeSelector: { type: String, default: '[aria-current="page"], [aria-selected="true"], .cn-tab-active, .cn-seg-item-active' },
+  activeSelector: { type: String, default: '[aria-current="page"], [aria-selected="true"], [aria-checked="true"], .cn-tab-active, .cn-seg-item-active, .cn-chip-active' },
 })
 
 const SIDES = [{ dir: -1 }, { dir: 1 }]
@@ -129,7 +129,7 @@ onMounted(async () => {
   resizeObs.observe(el)
   for (const child of el.children) resizeObs.observe(child)
   mutationObs = new MutationObserver(() => { update(); revealActive() })
-  mutationObs.observe(el, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'aria-current', 'aria-selected'] })
+  mutationObs.observe(el, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'aria-current', 'aria-selected', 'aria-checked'] })
   update()
   revealActive()
 })

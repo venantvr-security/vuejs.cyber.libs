@@ -11,7 +11,8 @@
     ></div>
 
     <div class="relative flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-      <div class="min-w-0">
+      <!-- Colonne texte prioritaire : largeur minimale pour éviter un chapeau mot à mot -->
+      <div class="min-w-0 xl:flex-1 xl:min-w-[24rem]">
         <div v-if="$slots.eyebrow" class="flex flex-wrap items-center gap-2 mb-2">
           <slot name="eyebrow"></slot>
         </div>
@@ -25,9 +26,9 @@
           >
             <slot name="icon"></slot>
           </div>
-          <h1 class="font-heading text-xl sm:text-2xl font-bold tracking-tight text-slate-50 min-w-0">
+          <component :is="as" class="font-heading text-xl sm:text-2xl font-bold tracking-tight text-slate-50 min-w-0">
             <slot name="title"></slot>
-          </h1>
+          </component>
         </div>
 
         <p v-if="$slots.lead" class="text-sm text-slate-300 leading-relaxed max-w-3xl mt-1.5">
@@ -39,7 +40,7 @@
         </div>
       </div>
 
-      <div v-if="$slots.actions" class="flex flex-wrap gap-2 shrink-0">
+      <div v-if="$slots.actions" class="flex flex-wrap items-center gap-2 min-w-0 xl:justify-end xl:max-w-[55%]">
         <slot name="actions"></slot>
       </div>
     </div>
@@ -54,6 +55,12 @@
 import { computed } from 'vue'
 
 const props = defineProps({
+  // Niveau de titre : h1 par défaut, h2 quand l'application porte déjà un h1
+  as: {
+    type: String,
+    default: 'h1',
+    validator: (v) => ['h1', 'h2', 'h3'].includes(v)
+  },
   accent: {
     type: String,
     default: 'cyan',

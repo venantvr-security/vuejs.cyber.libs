@@ -62,9 +62,11 @@ Polices à charger dans `index.html` :
 | `cn-page-title`, `cn-page-subtitle` | titre et chapeau de vue |
 | `cn-card`, `cn-inset` | carte vitrée, encart |
 | `cn-body`, `cn-meta` | texte courant (`text-sm`), méta (`text-xs`) |
-| `cn-pill` + `cn-pill-{cyan,emerald,amber,rose,violet,slate}` | pastille de statut |
+| `cn-pill` + `cn-pill-{cyan,emerald,amber,rose,violet,slate,blue,purple}` | pastille de statut |
+| `cn-chip`, `cn-chip-active` | puce de filtre / onglet compact |
+| `cn-focus` | anneau de focus clavier (déjà inclus dans boutons, onglets, puces) |
 | `cn-seg`, `cn-seg-item`, `cn-seg-item-active` | contrôle segmenté |
-| `cn-btn`, `cn-btn-primary`, `cn-btn-ghost`, `cn-icon-btn` | boutons |
+| `cn-btn`, `cn-btn-primary`, `cn-btn-ghost`, `cn-btn-danger`, `cn-icon-btn`, `cn-icon-btn-sm` | boutons |
 | `cn-input`, `cn-label` | champs de formulaire |
 | `cn-bubble-user`, `cn-bubble-actor`, `cn-bubble-system` | bulles de chat |
 | `cn-tab`, `cn-tab-active`, `cn-tab-mobile`, `cn-tab-mobile-active` | navigation principale |
@@ -77,7 +79,15 @@ Règle typographique : texte courant en `text-sm`, `text-xs` réservé aux libel
 Aucun texte n'est codé en dur : tout passe par props et slots (les applications gèrent l'i18n).
 
 - `components/CyberModal.vue` : coque de modale (fond, panneau, en-tête, fermeture Échap/clic, pied).
-- `components/CyberPageHeader.vue` : en-tête de vue (pastille, icône, titre, chapeau, actions).
+- `components/CyberPageHeader.vue` : en-tête de vue (pastille, icône, titre, chapeau, actions) ; prop `as` (`h1` par défaut, `h2`, `h3`).
+- `components/CyberGauge.vue` : jauge de score (icône, titre, sous-titre, barre `role="progressbar"`, pied en slot par défaut ; props `value`, `max`, `unit`, `accent`, `badgeClass`).
+- `components/CyberNavTabs.vue` : navigation principale (rail desktop défilant + grille mobile) depuis une liste `items` (`id`, `label`, `mobileLabel`, `icon`, `iconClass`, `title`, `badge`, `badgeClass`, `accent`) ; `v-model` = vue active ; slot `desktop-end`.
+- `components/CyberVoiceButton.vue` : lecture / arrêt de synthèse vocale (`speechId`, `text`, `voice`, `playLabel`, `stopLabel`, `showLabel`, `size`) ; masqué si le navigateur ne la supporte pas.
+- `components/CyberDictationButton.vue` : bouton micro de dictée (`listening`, `supported`, `startLabel`, `stopLabel`, `unsupportedLabel`, `showLabel`) ; émet `toggle`.
+- `components/CyberInlineAlert.vue` : message d'erreur en ligne (`role="alert"`, `tone`, `dismissLabel`) ; émet `dismiss`.
+- `components/CyberSegmented.vue` : choix unique (contrôle segmenté `variant="seg"` ou puces `variant="chip"`, `scroll` pour un rail) avec sémantique radiogroup et navigation aux flèches ; `options` (`value`, `label`, `icon`, `title`, `count`, `disabled`, `class`, `activeClass`) ; `v-model` ; slot `option`.
+- `components/CyberStatTile.vue` : tuile de chiffre clé (`accent`, `variant` `card` | `inset`) ; slots `label`, défaut (valeur), `hint`, `icon`.
+- `components/CyberEmptyState.vue` : état vide (`compact`) ; slots `icon`, `title`, défaut (message), `actions`.
 - `components/CyberScrollRail.vue` : barre horizontale défilante pour les menus larges. Des contrôles apparaissent à gauche et à droite quand du contenu est masqué : survol = défilement continu, clic = une page ; molette verticale convertie en horizontal ; l'élément actif (`aria-current="page"`, `.cn-tab-active`…) est ramené dans la vue. Props : `track-class` (gap/alignement de la piste), `fade-class` (dégradé accordé au fond, ex. `from-slate-800 via-slate-800/80 to-transparent` dans une modale), `speed` (px/s), `wheel`.
 - `components/CyberAccordion.vue` : accordéon `<details>`.
 - `components/CyberTermTooltip.vue` : infobulle du lexique au survol.

@@ -1,0 +1,19 @@
+# Dépendances
+node_modules/
+
+# Logs
+npm-debug.log*
+*.log
+
+# Cache & outils
+.cache/
+*.tsbuildinfo
+
+# Éditeurs & OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db

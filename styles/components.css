@@ -112,13 +112,20 @@
   .cn-pill-rose { @apply bg-rose-500/10 border-rose-500/30 text-rose-300; }
   .cn-pill-violet { @apply bg-violet-500/10 border-violet-500/30 text-violet-300; }
   .cn-pill-slate { @apply bg-slate-800/60 border-slate-700 text-slate-300; }
+  .cn-pill-blue { @apply bg-blue-500/10 border-blue-500/30 text-blue-300; }
+  .cn-pill-purple { @apply bg-purple-500/10 border-purple-500/30 text-purple-300; }
+
+  /* Anneau de focus clavier commun aux contrôles */
+  .cn-focus {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70 focus-visible:ring-offset-0;
+  }
 
   /* Contrôle segmenté (onglets compacts) */
   .cn-seg {
     @apply grid gap-1 p-1 bg-slate-950 rounded-xl border border-slate-800;
   }
   .cn-seg-item {
-    @apply py-1.5 px-2 rounded-lg border border-transparent text-sm text-center text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center gap-1.5;
+    @apply py-1.5 px-2 rounded-lg border border-transparent text-sm text-center text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center gap-1.5 cn-focus;
   }
   .cn-seg-item-active {
     @apply bg-cyan-500/20 text-cyan-300 border-cyan-500/40 font-semibold hover:text-cyan-300;
@@ -126,7 +133,7 @@
 
   /* Boutons */
   .cn-btn {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed cn-focus;
   }
   .cn-btn-primary {
     @apply cn-btn px-4 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-black font-semibold;
@@ -134,8 +141,23 @@
   .cn-btn-ghost {
     @apply cn-btn px-3 py-1.5 bg-slate-900/80 border border-slate-700 text-slate-300 hover:text-cyan-300 hover:border-cyan-500/40 hover:bg-cyan-500/10;
   }
+  .cn-btn-danger {
+    @apply cn-btn px-3 py-1.5 bg-slate-900/80 border border-slate-700 text-slate-300 hover:text-rose-300 hover:border-rose-500/40 hover:bg-rose-500/10;
+  }
   .cn-icon-btn {
-    @apply inline-flex items-center justify-center p-2 rounded-lg border border-slate-700 bg-slate-900/80 text-slate-300 hover:bg-slate-800 transition-colors;
+    @apply inline-flex items-center justify-center p-2 rounded-lg border border-slate-700 bg-slate-900/80 text-slate-300 hover:bg-slate-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cn-focus;
+  }
+  /* Petit bouton icône sans bordure (actions de ligne, lecture audio…) */
+  .cn-icon-btn-sm {
+    @apply inline-flex items-center justify-center p-1 rounded text-slate-400 hover:text-cyan-300 hover:bg-slate-800/80 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cn-focus;
+  }
+
+  /* Puce filtrable / onglet compact (rails de catégories, filtres) */
+  .cn-chip {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm whitespace-nowrap transition-colors bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700 cn-focus;
+  }
+  .cn-chip-active {
+    @apply bg-cyan-500/20 border-cyan-500/50 text-cyan-300 font-semibold hover:text-cyan-300 hover:border-cyan-500/50;
   }
 
   /* Champs de saisie */
@@ -159,13 +181,13 @@
 
   /* Onglets de navigation principale */
   .cn-tab {
-    @apply flex items-center gap-2 px-3 py-2.5 border-b-2 border-transparent text-sm whitespace-nowrap text-slate-400 hover:text-slate-100 hover:bg-slate-800/40 transition-colors;
+    @apply flex items-center gap-2 px-3 py-2.5 border-b-2 border-transparent text-sm whitespace-nowrap text-slate-400 hover:text-slate-100 hover:bg-slate-800/40 transition-colors cn-focus;
   }
   .cn-tab-active {
     @apply text-cyan-300 border-cyan-400 bg-cyan-500/5 font-semibold hover:text-cyan-300 hover:bg-cyan-500/5;
   }
   .cn-tab-mobile {
-    @apply flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg border text-xs font-medium whitespace-nowrap transition-all bg-slate-900/70 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800/50;
+    @apply flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg border text-xs font-medium whitespace-nowrap transition-all bg-slate-900/70 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 cn-focus;
   }
   .cn-tab-mobile-active {
     @apply bg-cyan-500/20 border-cyan-400 text-cyan-200 font-semibold hover:text-cyan-200 hover:bg-cyan-500/20;
