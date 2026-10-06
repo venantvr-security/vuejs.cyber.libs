@@ -111,9 +111,14 @@ function onWheel(e) {
   el.scrollLeft = Math.max(0, Math.min(max, next))
 }
 
-function revealActive() {
+// Dernier élément actif ramené dans la vue : une mutation qui ne change pas l'actif ne fait pas défiler
+let lastActive = null
+
+function revealActive(force = false) {
   const el = track.value
-  const active = el?.querySelector(props.activeSelector)
+  const active = el?.querySelector(props.activeSelector) || null
+  if (!force && active === lastActive) return
+  lastActive = active
   if (!active) return
   const a = active.getBoundingClientRect()
   const t = el.getBoundingClientRect()
@@ -122,21 +127,36 @@ function revealActive() {
   else if (a.right > t.right - margin) el.scrollBy({ left: a.right - t.right + margin, behavior: 'smooth' })
 }
 
+let unmounted = false
+
 onMounted(async () => {
   await nextTick()
   const el = track.value
-  resizeObs = new ResizeObserver(update)
-  resizeObs.observe(el)
-  for (const child of el.children) resizeObs.observe(child)
-  mutationObs = new MutationObserver(() => { update(); revealActive() })
-  mutationObs.observe(el, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'aria-current', 'aria-selected', 'aria-checked'] })
+  // Démonté pendant l'attente, ou piste absente
+  if (!el || unmounted) return
+  if (typeof ResizeObserver === 'function') {
+    resizeObs = new ResizeObserver(update)
+    resizeObs.observe(el)
+    for (const child of el.children) resizeObs.observe(child)
+  }
+  if (typeof MutationObserver === 'function') {
+    mutationObs = new MutationObserver((records) => {
+      update()
+      // Nouveaux enfants : la taille de la piste change aussi
+      if (resizeObs) records.forEach((r) => r.addedNodes.forEach((n) => n.nodeType === 1 && n.parentNode === el && resizeObs.observe(n)))
+      revealActive()
+    })
+    mutationObs.observe(el, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'aria-current', 'aria-selected', 'aria-checked'] })
+  }
   update()
-  revealActive()
+  revealActive(true)
 })
 
 onBeforeUnmount(() => {
+  unmounted = true
   stopHover()
   resizeObs?.disconnect()
   mutationObs?.disconnect()
+  lastActive = null
 })
 </script>
