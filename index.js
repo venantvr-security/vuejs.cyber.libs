@@ -1,21 +1,28 @@
 import { jsonrepair } from 'jsonrepair'
+import { containsTerm, matchTermGroups, describeStakeholderForPrompt, assessAgainstStakeholder } from './services/stakeholderProfile.js'
+
+// La famille gemini-1.5 est retirée : chaque appel échouait et basculait sur le moteur local
+export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
+export const FALLBACK_GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash']
+
+export { containsTerm, matchTermGroups, findMentionedActors, describeStakeholderForPrompt, assessAgainstStakeholder } from './services/stakeholderProfile.js'
 
 export class WarRoomEngine {
   /**
    * Initialise le moteur de War Room.
    * @param {Object} options 
    * @param {string} options.apiKey Clé API Gemini
-   * @param {string} options.model Modèle préféré (ex: 'gemini-2.0-flash')
+   * @param {string} options.model Modèle préféré (ex: 'gemini-2.5-flash')
    * @param {Function} options.systemPromptGenerator Fonction retournant le prompt système
    * @param {Function} options.localSimulator Fonction de fallback si Gemini échoue
    * @param {number} options.maxTokens (Optionnel) Max tokens, defaut 2048
    */
   constructor(options) {
     this.apiKey = options.apiKey
-    this.model = options.model || 'gemini-1.5-flash'
+    this.model = options.model || DEFAULT_GEMINI_MODEL
     this.systemPromptGenerator = options.systemPromptGenerator
     this.localSimulator = options.localSimulator
-    this.candidateModels = options.candidateModels || ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash']
+    this.candidateModels = options.candidateModels || FALLBACK_GEMINI_MODELS
     this.maxTokens = options.maxTokens || 2048
   }
   
@@ -233,144 +240,178 @@ export function parseGeminiJson(rawText) {
 
 
 /**
- * Moteur d'évaluation Pédagogique (Tech to Board) avec Gemini et fallback local.
+ * Moteur d'évaluation pédagogique (Tech-to-Board) : Gemini, avec repli local.
+ *
+ * caseStudy (champs communs aux deux applications, tous optionnels sauf le texte de référence) :
+ *   context, technicalFact, decisionQuestion (ou boardQuestion), idealAnswer (ou suggestedPitch),
+ *   mustConvey: TermGroup[]  faits à transmettre, pitfalls: TermGroup[]  affirmations à proscrire,
+ *   jargonWords, businessWords, actionWords, keywordsToInclude: string[]
+ * stakeholder : acteur de data/actors.js avec son profile (voir services/stakeholderProfile.js)
  */
 export class TechToBoardEngine {
   constructor(options = {}) {
     this.apiKey = options.apiKey || null
-    this.model = options.model || 'gemini-1.5-flash'
+    this.model = options.model || DEFAULT_GEMINI_MODEL
   }
 
-  // Fallback local statique mutualisé
-  evaluateLocally(text, caseStudy, targetStakeholderId) {
-    const lower = (text || '').toLowerCase();
-    let score = 50;
-    const feedback = [];
-    
-    // Support for both Cyber and CTI data structures
-    const isCyber = !!caseStudy.jargonWords;
-    
-    if (isCyber) {
-      // Logique Cyber (Jargon, Business, Stakeholders)
-      const st = caseStudy?.stakeholders?.[targetStakeholderId] || caseStudy?.stakeholders?.dg;
-      const jargon = caseStudy.jargonWords || [];
-      let jargonCount = 0;
-      jargon.forEach(w => { if (lower.includes(w.toLowerCase())) jargonCount++ });
-      
-      if (targetStakeholderId === 'rssi' || targetStakeholderId === 'leaddev') {
-        if (jargonCount >= 1) { score += 15; feedback.push("✅ Précision technique adaptée."); }
-        else { score -= 5; feedback.push("💡 Un interlocuteur technique appréciera plus de précisions."); }
-      } else {
-        if (jargonCount > 2) { score -= 25; feedback.push("⚠️ Trop de jargon technique brut. La direction décrochera."); }
-        else if (jargonCount > 0) { score -= 10; feedback.push("💡 Présence de jargon. Utilisez une analogie fonctionnelle."); }
-        else { score += 15; feedback.push("✅ Bon niveau de vulgarisation sans jargon barbare."); }
-      }
-      
-      const business = caseStudy.businessWords || [];
-      let bCount = 0;
-      business.forEach(w => { if (lower.includes(w.toLowerCase())) bCount++ });
-      if (bCount >= 2) { score += 20; feedback.push("✅ Excellente orientation métier et business."); }
-      
-      // Additional check for length
-      if (lower.length < 50) { score -= 20; feedback.push("⚠️ Réponse beaucoup trop courte pour être convaincante."); }
-      
-    } else {
-      // Logique CTI (Keywords, Length)
-      const keywords = caseStudy.keywordsToInclude || [];
-      let matched = 0;
-      keywords.forEach(kw => { if (lower.includes(kw.toLowerCase())) matched++ });
-      
-      const lengthScore = Math.min(30, Math.round(lower.length / 10));
-      const keywordScore = keywords.length > 0 ? Math.round((matched / keywords.length) * 70) : 70;
-      score = Math.min(100, lengthScore + keywordScore);
-      
-      feedback.push(`Vous avez inclus ${matched} mots-clés stratégiques sur ${keywords.length}.`);
-      if (matched === keywords.length) {
-        feedback.push("✅ Couverture parfaite des concepts clés.");
-      } else {
-        feedback.push("💡 Pensez à intégrer davantage les termes stratégiques attendus par la direction.");
-      }
+  evaluateLocally(text, caseStudy = {}, stakeholder = null) {
+    const lower = (text || '').toLowerCase()
+    const feedback = []
+    const hits = (words) => (words || []).filter((w) => containsTerm(lower, w, { prefix: true })).length
+    let score = 50
+
+    // 1. Jargon, selon la tolérance du décideur visé
+    const jargonCount = (caseStudy.jargonWords || []).filter((w) => containsTerm(lower, w)).length
+    const tolerance = stakeholder?.profile?.jargonTolerance || 'low'
+    if (caseStudy.jargonWords?.length) {
+      if (tolerance === 'high') {
+        if (jargonCount >= 1) { score += 10; feedback.push('✅ Précision technique adaptée à cet interlocuteur.') }
+        else { score -= 5; feedback.push('💡 Cet interlocuteur attend des précisions techniques.') }
+      } else if (tolerance === 'medium') {
+        if (jargonCount > 3) { score -= 10; feedback.push('💡 Beaucoup de termes techniques : expliquez-les.') }
+        else { score += 5 }
+      } else if (jargonCount > 2) { score -= 20; feedback.push('⚠️ Trop de jargon technique brut : la direction décrochera.') }
+      else if (jargonCount > 0) { score -= 8; feedback.push('💡 Présence de jargon : préférez une analogie fonctionnelle.') }
+      else { score += 10; feedback.push('✅ Bon niveau de vulgarisation.') }
     }
-    
-    score = Math.max(0, Math.min(100, score));
-    let grade = 'C';
-    if (score >= 80) grade = 'A';
-    else if (score >= 60) grade = 'B';
-    else if (score < 40) grade = 'D';
+
+    // 2. Vocabulaire métier attendu (cas Cyber) ou mots-clés du cas (cas CTI)
+    if (caseStudy.businessWords?.length && hits(caseStudy.businessWords) >= 2) {
+      score += 10
+      feedback.push('✅ Orientation métier (patients, coûts, planning, réputation).')
+    }
+    if (caseStudy.keywordsToInclude?.length) {
+      const matched = hits(caseStudy.keywordsToInclude)
+      score += Math.round((matched / caseStudy.keywordsToInclude.length) * 40) - 15
+      feedback.push(`Concepts clés couverts : ${matched} / ${caseStudy.keywordsToInclude.length}.`)
+    }
+
+    // 3. Faits à transmettre et affirmations à proscrire
+    const convey = matchTermGroups(lower, caseStudy.mustConvey)
+    score += convey.met.length * 5
+    if (convey.missed.length) feedback.push(`💡 Il manque : ${convey.missed.join(', ')}.`)
+    const pitfalls = matchTermGroups(lower, caseStudy.pitfalls)
+    score -= pitfalls.met.length * 15
+    pitfalls.met.forEach((label) => feedback.push(`⚠️ À proscrire : ${label}.`))
+    const breaches = [...pitfalls.met]
+
+    // 4. Attentes et lignes rouges du décideur
+    let assessment = null
+    if (stakeholder) {
+      assessment = assessAgainstStakeholder(lower, stakeholder)
+      score += assessment.expectationsMet.length * 4
+      if (assessment.expectationsMissed.length) {
+        feedback.push(`💡 ${stakeholder.name} attend aussi : ${assessment.expectationsMissed.join(', ')}.`)
+      }
+      score -= assessment.redLinesCrossed.length * 15
+      assessment.redLinesCrossed.forEach((label) => feedback.push(`⛔ Ligne rouge pour ${stakeholder.name} : ${label}.`))
+      breaches.push(...assessment.redLinesCrossed)
+    }
+
+    // 5. Une note au décideur se termine par une décision, un délai ou une demande d'arbitrage
+    if (caseStudy.actionWords?.length) {
+      if (hits(caseStudy.actionWords)) { score += 10; feedback.push('✅ Recommandation actionnable.') }
+      else { score -= 10; feedback.push('💡 Aucune décision explicite : terminez par ce que vous demandez au décideur.') }
+    }
+
+    // 6. Une liste de mots-clés n'est pas une synthèse rédigée
+    const wordCount = lower.split(/\s+/).filter(Boolean).length
+    if (wordCount < 40) {
+      score = Math.min(score, 55)
+      feedback.push('⚠️ Réponse trop courte : rédigez faits, impact, niveau de confiance et recommandation.')
+    }
+
+    // Un piège ou une ligne rouge franchis empêchent une bonne note, quel que soit le reste
+    const rawScore = Math.round(score)
+    score = Math.max(0, Math.min(100, rawScore))
+    if (breaches.length) score = Math.min(score, 45)
+    const grade = score >= 80 ? 'A' : score >= 60 ? 'B' : score >= 40 ? 'C' : 'D'
 
     return {
       score,
+      rawScore,
       grade,
       feedback,
-      stakeholderReaction: { text: "Intéressant, mais nous devons en rediscuter." },
+      stakeholderReaction: { text: this.localReaction(score, caseStudy, stakeholder, breaches, assessment) },
       dgReaction: "Merci pour ce point, nous allons l'analyser.",
       _engineFallback: true
     }
   }
 
-  async evaluateAnswer({ text, caseStudy, targetStakeholderId = 'dg' }) {
+  // Réaction hors ligne : celle rédigée pour le cas si elle existe, sinon tirée du profil du décideur
+  localReaction(score, caseStudy, stakeholder, breaches, assessment) {
+    const band = score >= 75 ? 'success' : score >= 50 ? 'neutral' : 'fail'
+    const written = caseStudy.stakeholders?.[stakeholder?.id]?.reactions?.[band]
+    if (written) return written
+    if (breaches.length) return `« ${breaches[0]} : je ne peux pas valider cela en l'état. »`
+    const missing = assessment?.expectationsMissed?.[0]
+    if (band === 'success') return '« Clair et actionnable, je valide la recommandation. »'
+    if (missing) return `« Sur le principe je vous suis, mais il me manque : ${missing.charAt(0).toLowerCase() + missing.slice(1)}. »`
+    return '« Intéressant, mais nous devons en rediscuter. »'
+  }
+
+  async evaluateAnswer({ text, caseStudy = {}, stakeholder = null }) {
     if (!this.apiKey || !text || text.trim().length < 10) {
-      return this.evaluateLocally(text, caseStudy, targetStakeholderId)
+      return this.evaluateLocally(text, caseStudy, stakeholder)
     }
 
-    const systemInstruction = `Tu es un coach expert en communication pour responsables Cybersécurité et CTI (Cyber Threat Intelligence). Ton rôle est d'évaluer la capacité d'un expert à vulgariser un sujet complexe pour un décideur ou un membre du comité de direction (DG, DSI, DPO, RSSI, etc).
-
-Tu reçois la situation (Contexte, Fait Technique, Question du comité) et le texte rédigé par l'apprenant. La cible est : ${targetStakeholderId}.
+    const labels = (groups) => (groups || []).map((g) => `- ${g.label}`).join('\n')
+    const systemInstruction = `Tu es un coach expert en communication pour responsables cybersécurité et CTI. Tu évalues la capacité d'un expert à exposer un sujet technique à un décideur précis, dont le profil est fourni.
 
 Règles de notation :
-- Le jargon technique brut non expliqué est sanctionné s'il s'adresse à un non-technicien (DG, DPO). Il est toléré pour un RSSI/LeadDev.
-- L'apprenant doit utiliser des analogies fonctionnelles et parler "Métier" (impacts business, financiers, réputationnels).
-- Le ton doit être professionnel, rassurant mais factuel.
+- Adapte l'exigence de vulgarisation à la tolérance au jargon du décideur.
+- Valorise : faits exacts, impact métier chiffré, niveau de confiance explicite, recommandation actionnable (décision, délai, arbitrage demandé), réponse aux enjeux et attentes du décideur.
+- Sanctionne : affirmations à proscrire listées, franchissement des lignes rouges du décideur, promesses non tenables, jargon non expliqué pour un non-technicien.
 
-Tu dois répondre UNIQUEMENT par un objet JSON valide (sans markdown) avec cette structure exacte :
+Réponds UNIQUEMENT par un objet JSON valide (sans markdown) :
 {
-  "score": <nombre entre 0 et 100>,
-  "grade": "<lettre A, B, C ou D>",
-  "feedback": [
-    "<point fort 1>",
-    "<point d'amélioration 1>",
-    "<conseil spécifique sur l'analogie ou le ton>"
-  ],
-  "stakeholderReaction": {
-    "text": "<Une phrase de réaction typique et en langage parlé du décideur cible face à cette réponse, ex: 'C'est bien beau vos histoires de hash, mais ça coûte combien cette panne ?'>"
-  }
-}`;
+  "score": <0 à 100>,
+  "grade": "<A, B, C ou D>",
+  "feedback": ["<point fort>", "<point d'amélioration>", "<conseil sur la formulation pour ce décideur>"],
+  "stakeholderReaction": { "text": "<réaction parlée, crédible, de ce décideur à cette réponse>" }
+}`
 
     const userPrompt = `
-Contexte du cas : ${caseStudy.context}
-Fait technique : ${caseStudy.technicalFact}
-Question posée par le Comex : ${caseStudy.boardQuestion}
-Réponse idéale de référence : ${caseStudy.idealAnswer || 'Une réponse claire, orientée risque et métier, sans jargon.'}
+DÉCIDEUR VISÉ
+${describeStakeholderForPrompt(stakeholder) || 'Comité de direction'}
+
+CAS
+Contexte : ${caseStudy.context || caseStudy.title || ''}
+Fait technique : ${caseStudy.technicalFact || ''}
+Question du décideur : ${caseStudy.decisionQuestion || caseStudy.boardQuestion || ''}
+Faits à transmettre :
+${labels(caseStudy.mustConvey) || '- (non précisé)'}
+Affirmations à proscrire :
+${labels(caseStudy.pitfalls) || '- (non précisé)'}
+Réponse de référence : ${caseStudy.idealAnswer || caseStudy.suggestedPitch || 'Une réponse claire, orientée risque et métier, sans jargon.'}
 
 ---
-Réponse fournie par l'apprenant :
+Réponse de l'apprenant :
 "${text}"
-`;
+`
 
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model.replace('models/', '')}:generateContent?key=${this.apiKey.trim()}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model.replace('models/', '')}:generateContent?key=${this.apiKey.trim()}`
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: systemInstruction }] },
           contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-          generationConfig: { responseMimeType: "application/json", temperature: 0.3 }
+          generationConfig: { responseMimeType: 'application/json', temperature: 0.3 }
         })
-      });
+      })
 
       if (response.ok) {
-        const data = await response.json();
-        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (rawText) {
-          return parseGeminiJson(rawText);
-        }
+        const data = await response.json()
+        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text
+        if (rawText) return parseGeminiJson(rawText)
       }
     } catch (e) {
-      console.warn('Erreur Gemini TechToBoard:', e);
+      console.warn('Erreur Gemini TechToBoard:', e)
     }
-    
-    return this.evaluateLocally(text, caseStudy, targetStakeholderId);
+
+    return this.evaluateLocally(text, caseStudy, stakeholder)
   }
 }
 export { default as cyberVisualsPreset } from './tailwind.preset.js'

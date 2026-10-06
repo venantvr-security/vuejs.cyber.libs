@@ -95,3 +95,30 @@ Aucun texte n'est codé en dur : tout passe par props et slots (les applications
 ## Services
 
 - `services/voiceService.js` : synthèse et dictée vocales.
+
+## Profils de parties prenantes et moteurs
+
+`services/stakeholderProfile.js` (réexporté par `index.js`) lit un objet `profile` facultatif sur chaque acteur de `data/actors.js`. Le même profil alimente la War Room (routage des interpellations, réactions locales), le coach Tech-to-Board et les prompts Gemini.
+
+```js
+profile: {
+  aliases: ['julien', 'rssi'],                       // interpellations reconnues
+  mandate: 'Garant de la PSSI, prépare le dossier d\'homologation',
+  decisionRights: { decides: [], vetoes: ['mise en production sans FARR'], advises: ['homologation'] },
+  stakes: ['conformité HDS', 'traçabilité des dérogations'],
+  evaluationCriteria: ['mesure compensatoire datée', 'risque résiduel formalisé'],
+  expectations: [{ label: 'FARR signée et datée', terms: ['farr', 'acceptation du risque'] }],
+  redLines: [{ label: 'dérogation sans échéance', terms: ['sans échéance', 'indéfiniment'] }],
+  jargonTolerance: 'high',                            // low | medium | high
+  regulatoryFocus: ['RGPD art. 32', 'référentiel HDS 2024'],
+  communicationStyle: 'factuel, demande des preuves écrites'
+}
+```
+
+Les `terms` sont des radicaux reconnus en début de mot (`containsTerm(text, term, { prefix: true })`) ; les unités collées à un nombre sont reconnues (« 150k€ », « 72h »). Les occurrences niées ne comptent pas (« sans FARR », « pas de coupure », « ne notifions pas ») : une ligne rouge dont la faute est une négation s'écrit avec elle (« ne pas notifier »). Un groupe peut porter un `impact` propre à l'application, renvoyé par `assessAgainstStakeholder` (`redLineGroups`, `expectationGroups`).
+
+Dans le coach, un piège ou une ligne rouge franchis plafonnent la note à 45 (`rawScore` garde la note brute) ; la réaction hors ligne reprend `caseStudy.stakeholders[id].reactions` si le cas en fournit, sinon elle est tirée du profil.
+
+Cas du coach (`TechToBoardEngine.evaluateAnswer({ text, caseStudy, stakeholder })`) : `context`, `technicalFact`, `decisionQuestion`, `idealAnswer`, `mustConvey` et `pitfalls` (groupes de termes), `jargonWords`, `businessWords`, `actionWords`, `keywordsToInclude`.
+
+Fonctions : `containsTerm`, `matchTermGroups`, `findMentionedActors`, `describeStakeholderForPrompt`, `assessAgainstStakeholder`, constantes `DEFAULT_GEMINI_MODEL`, `FALLBACK_GEMINI_MODELS`.

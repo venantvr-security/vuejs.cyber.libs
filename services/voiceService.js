@@ -33,12 +33,16 @@ export function stripMarkdownForSpeech(text) {
 }
 
 // Actor persona audio pitch and rate settings
+// Profils de voix par identifiant d'acteur (communs aux deux applications)
 const ACTOR_VOICE_PROFILES = {
-  dg: { pitch: 1.15, rate: 1.05, female: true },       // Dr. Marie Bernard (Énergique, dirigeante)
-  rssi: { pitch: 0.90, rate: 1.0, female: false },      // Julien Roche (Posé, grave, technique)
-  leaddev: { pitch: 0.85, rate: 1.1, female: false },   // Thomas Brun (Rapide, direct)
-  auditor: { pitch: 1.20, rate: 0.95, female: true },   // Claire Delmas (Stricte, mesurée)
-  dsi_local: { pitch: 0.80, rate: 1.0, female: false }, // Marc Lemoine (Voix de terrain)
+  dg: { pitch: 1.15, rate: 1.05, female: true },        // Direction générale (énergique)
+  rssi: { pitch: 0.90, rate: 1.0, female: false },      // RSSI (posé, technique)
+  leaddev: { pitch: 0.85, rate: 1.1, female: false },   // Lead tech / MOE (rapide, direct)
+  auditor: { pitch: 1.20, rate: 0.95, female: true },   // Inspection / tutelle (stricte, mesurée)
+  dsi_local: { pitch: 0.80, rate: 1.0, female: false }, // DSI de terrain
+  soc_lead: { pitch: 0.95, rate: 1.1, female: false },  // Lead SOC (vif, opérationnel)
+  ot_lead: { pitch: 1.10, rate: 1.0, female: true },    // Responsable OT / SCADA (prudente)
+  cfo: { pitch: 0.85, rate: 0.95, female: false },      // Direction financière (posé, chiffré)
   arbitration: { pitch: 1.05, rate: 1.0, female: false },
   system: { pitch: 1.0, rate: 1.05, female: false },
   user: { pitch: 1.0, rate: 1.0, female: false }
