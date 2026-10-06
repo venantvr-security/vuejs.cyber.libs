@@ -169,6 +169,8 @@ function isTop() {
 function onKeydown(e) {
   if (!isTop()) return
   if (e.key === 'Escape') {
+    // Échap pendant une composition (IME, accents morts) annule la composition, pas la modale
+    if (e.isComposing || e.keyCode === 229) return
     e.stopPropagation()
     emit('close')
     return
@@ -183,6 +185,12 @@ function onKeydown(e) {
   const first = items[0]
   const last = items[items.length - 1]
   const active = document.activeElement
+  // Focus sorti du panneau (clic sur le fond, élément retiré du DOM…) : on le ramène dedans
+  if (!panel.value.contains(active)) {
+    e.preventDefault()
+    ;(e.shiftKey ? last : first).focus()
+    return
+  }
   if (e.shiftKey && (active === first || active === panel.value)) {
     e.preventDefault()
     last.focus()
@@ -209,10 +217,12 @@ async function activate() {
 function deactivate() {
   const i = stack.indexOf(token)
   if (i === -1) return
+  // Seule la modale au premier plan rend le focus : fermer une modale du dessous ne le vole pas à celle du dessus
+  const wasTop = i === stack.length - 1
   stack.splice(i, 1)
   window.removeEventListener('keydown', onKeydown)
   if (!stack.length) document.body.style.overflow = shared.overflow
-  if (previousFocus && typeof previousFocus.focus === 'function' && document.contains(previousFocus)) {
+  if (wasTop && previousFocus && typeof previousFocus.focus === 'function' && document.contains(previousFocus)) {
     previousFocus.focus({ preventScroll: true })
   }
   previousFocus = null

@@ -1,7 +1,7 @@
 // Web Speech API Voice Service for CYBER-NEXUS (Chrome & Chromium-based browsers)
 // Provides Text-to-Speech (TTS) for statements & stakeholder voices, and Speech-to-Text (STT) for user input dictation.
 
-import { ref } from 'vue'
+import { ref, getCurrentScope, onScopeDispose } from 'vue'
 
 export const currentlySpeakingId = ref(null)
 export const isSpeakingGlobal = ref(false)
@@ -52,45 +52,63 @@ let cachedFrenchVoices = []
 
 function loadVoices() {
   if (!isSpeechSynthesisSupported()) return []
-  const allVoices = window.speechSynthesis.getVoices()
-  const frVoices = allVoices.filter(v => v.lang === 'fr-FR' || v.lang.startsWith('fr'))
+  const allVoices = window.speechSynthesis.getVoices() || []
+  const frVoices = allVoices.filter(v => typeof v?.lang === 'string' && (v.lang === 'fr-FR' || v.lang.toLowerCase().startsWith('fr')))
   cachedFrenchVoices = frVoices.length > 0 ? frVoices : allVoices
   return cachedFrenchVoices
 }
 
 if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
   loadVoices()
-  if (window.speechSynthesis.onvoiceschanged !== undefined) {
-    window.speechSynthesis.onvoiceschanged = () => {
+  // addEventListener : ne remplace pas un éventuel gestionnaire onvoiceschanged de l'application
+  const synth = window.speechSynthesis
+  if (typeof synth.addEventListener === 'function') {
+    synth.addEventListener('voiceschanged', loadVoices)
+  } else if (synth.onvoiceschanged !== undefined) {
+    const previous = synth.onvoiceschanged
+    synth.onvoiceschanged = function (event) {
       loadVoices()
+      if (typeof previous === 'function') return previous.call(this, event)
     }
   }
 }
+
+// Mots du nom de voix, sans accents (« Amélie » → amelie) : « female » ne contient pas le mot « male »
+function voiceNameWords(name) {
+  return String(name || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+}
+
+const FEMALE_VOICE_WORDS = new Set(['female', 'femme', 'woman', 'hortense', 'amelie', 'audrey', 'virginie', 'julie', 'denise', 'eloise', 'celine', 'marie', 'lea', 'brigitte', 'aurelie', 'sylvie', 'chantal', 'charlotte', 'vivienne', 'coralie', 'jacqueline', 'ariane'])
+const MALE_VOICE_WORDS = new Set(['male', 'homme', 'man', 'thomas', 'nicolas', 'paul', 'henri', 'claude', 'remy', 'guillaume', 'daniel', 'mathieu', 'antoine', 'jean', 'fabrice', 'alain', 'gerard', 'jerome', 'yves', 'olivier'])
 
 function selectBestVoice(isFemale) {
   const voices = cachedFrenchVoices.length > 0 ? cachedFrenchVoices : loadVoices()
   if (!voices || voices.length === 0) return null
 
-  if (isFemale) {
-    const femaleVoice = voices.find(v => {
-      const name = v.name.toLowerCase()
-      return name.includes('female') || name.includes('femme') || name.includes('hortense') || name.includes('amelie') || name.includes('audrey') || name.includes('virginie')
-    })
-    if (femaleVoice) return femaleVoice
-  } else {
-    const maleVoice = voices.find(v => {
-      const name = v.name.toLowerCase()
-      return name.includes('male') || name.includes('homme') || name.includes('thomas') || name.includes('nicolas') || name.includes('paul')
-    })
-    if (maleVoice) return maleVoice
-  }
+  const wanted = isFemale ? FEMALE_VOICE_WORDS : MALE_VOICE_WORDS
+  const opposite = isFemale ? MALE_VOICE_WORDS : FEMALE_VOICE_WORDS
+  const match = voices.find((v) => {
+    const words = voiceNameWords(v.name)
+    return words.some((w) => wanted.has(w)) && !words.some((w) => opposite.has(w))
+  })
+  if (match) return match
 
   // Fallback to Google français or first available fr voice
-  const googleFr = voices.find(v => v.name.includes('Google') && v.lang.startsWith('fr'))
+  const googleFr = voices.find(v => String(v.name || '').includes('Google') && String(v.lang || '').toLowerCase().startsWith('fr'))
   return googleFr || voices[0]
 }
 
+// Énoncé en cours : les événements d'un énoncé annulé (onerror « interrupted »/« canceled », onend)
+// ne doivent pas modifier l'état de celui qui l'a remplacé
+let activeUtterance = null
+
 export function stopSpeaking() {
+  activeUtterance = null
   if (isSpeechSynthesisSupported()) {
     window.speechSynthesis.cancel()
   }
@@ -98,13 +116,14 @@ export function stopSpeaking() {
   isSpeakingGlobal.value = false
 }
 
+/** Lit un texte. Renvoie true si la lecture a été lancée. */
 export function speak(text, { actorId = 'system', onStart, onEnd, onError } = {}) {
-  if (!isSpeechSynthesisSupported() || !text) return
+  if (!isSpeechSynthesisSupported() || !text) return false
 
   stopSpeaking()
 
   const cleanText = stripMarkdownForSpeech(text)
-  if (!cleanText) return
+  if (!cleanText) return false
 
   const profile = ACTOR_VOICE_PROFILES[actorId] || ACTOR_VOICE_PROFILES.system
   const utterance = new SpeechSynthesisUtterance(cleanText)
@@ -118,35 +137,47 @@ export function speak(text, { actorId = 'system', onStart, onEnd, onError } = {}
   }
 
   utterance.onstart = () => {
+    if (activeUtterance !== utterance) return
     isSpeakingGlobal.value = true
     if (onStart) onStart()
   }
 
   utterance.onend = () => {
+    if (activeUtterance !== utterance) return
+    activeUtterance = null
     isSpeakingGlobal.value = false
     if (onEnd) onEnd()
   }
 
   utterance.onerror = (err) => {
+    const cancelled = err?.error === 'interrupted' || err?.error === 'canceled'
+    // Énoncé remplacé ou arrêté volontairement : rien à signaler, l'état appartient au suivant
+    if (activeUtterance !== utterance) return
+    activeUtterance = null
     isSpeakingGlobal.value = false
     currentlySpeakingId.value = null
-    console.warn('[VoiceService] Speech synthesis error:', err)
+    if (!cancelled) console.warn('[VoiceService] Speech synthesis error:', err)
     if (onError) onError(err)
   }
 
+  activeUtterance = utterance
   window.speechSynthesis.speak(utterance)
+  return true
 }
 
 // Composable for Text-to-Speech in components
 export function useVoiceSynthesis() {
+  // Dernier identifiant lu par ce composant : seul celui-ci est interrompu au démontage
+  let ownedId = null
+
   function play(id, text, actorId = 'system') {
     if (currentlySpeakingId.value === id) {
       stopSpeaking()
       return
     }
 
-    currentlySpeakingId.value = id
-    speak(text, {
+    // speak() commence par stopSpeaking() : l'identifiant est posé après, sinon il serait effacé
+    const started = speak(text, {
       actorId,
       onStart: () => {
         currentlySpeakingId.value = id
@@ -162,10 +193,22 @@ export function useVoiceSynthesis() {
         }
       }
     })
+    if (started) {
+      currentlySpeakingId.value = id
+      ownedId = id
+    }
   }
 
   function stop() {
     stopSpeaking()
+  }
+
+  // Démontage du composant : la lecture qu'il a lancée s'arrête (celle d'un autre composant continue)
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      if (ownedId !== null && currentlySpeakingId.value === ownedId) stop()
+      ownedId = null
+    })
   }
 
   return {
@@ -184,9 +227,11 @@ export function useVoiceDictation({ onTranscript, onError } = {}) {
   let activeInstance = null
   let baseText = ''
   let shouldBeListening = false
+  let disposed = false
+  let restartTimer = null
 
   function startRecognitionEngine() {
-    if (!shouldBeListening) return
+    if (!shouldBeListening || disposed) return
     if (!isSpeechRecognitionSupported()) {
       dictationError.value = "La reconnaissance vocale n'est pas supportée par ce navigateur."
       isListening.value = false
@@ -211,11 +256,13 @@ export function useVoiceDictation({ onTranscript, onError } = {}) {
     instance.maxAlternatives = 1
 
     instance.onstart = () => {
+      if (activeInstance !== instance) return
       isListening.value = true
       dictationError.value = null
     }
 
     instance.onresult = (event) => {
+      if (disposed) return
       let interim = ''
       let final = ''
 
@@ -240,6 +287,7 @@ export function useVoiceDictation({ onTranscript, onError } = {}) {
     }
 
     instance.onerror = (err) => {
+      if (activeInstance !== instance) return
       console.warn('[VoiceDictation] Error:', err.error)
       if (err.error === 'no-speech') {
         // Natural pause/silence in continuous mode - non-fatal
@@ -265,12 +313,16 @@ export function useVoiceDictation({ onTranscript, onError } = {}) {
     }
 
     instance.onend = () => {
+      // Instance remplacée (stop puis start rapprochés) : son arrêt ne concerne plus la dictée en cours
+      if (activeInstance !== instance) return
       activeInstance = null
       // In Chrome desktop, continuous listening may end upon brief silence;
       // auto-restart if user still wants to dictate and no fatal error occurred.
-      if (shouldBeListening && !dictationError.value) {
-        setTimeout(() => {
-          if (shouldBeListening) {
+      if (shouldBeListening && !disposed && !dictationError.value) {
+        clearTimeout(restartTimer)
+        restartTimer = setTimeout(() => {
+          restartTimer = null
+          if (shouldBeListening && !disposed) {
             startRecognitionEngine()
           }
         }, 150)
@@ -293,6 +345,7 @@ export function useVoiceDictation({ onTranscript, onError } = {}) {
   }
 
   async function start(initialText = '') {
+    if (disposed) return false
     if (!isSpeechRecognitionSupported()) {
       dictationError.value = "La reconnaissance vocale n'est pas supportée par ce navigateur."
       return false
@@ -318,19 +371,32 @@ export function useVoiceDictation({ onTranscript, onError } = {}) {
       }
     }
 
+    // Arrêt ou démontage pendant la demande d'autorisation du micro
+    if (!shouldBeListening || disposed) return false
     startRecognitionEngine()
     return true
   }
 
   function stop() {
     shouldBeListening = false
+    clearTimeout(restartTimer)
+    restartTimer = null
     if (activeInstance) {
-      try {
-        activeInstance.stop()
-      } catch (err) {}
+      const instance = activeInstance
       activeInstance = null
+      try {
+        instance.stop()
+      } catch (err) {}
     }
     isListening.value = false
+  }
+
+  // Démontage du composant : la dictée s'arrête et ne redémarre plus
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      disposed = true
+      stop()
+    })
   }
 
   function toggle(currentText = '') {

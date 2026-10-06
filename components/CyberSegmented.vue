@@ -64,10 +64,11 @@ function isSelected(option) {
   return option.value === props.modelValue
 }
 
-// Option atteignable par Tab : la sélection, sinon la première active
+// Option atteignable par Tab : la sélection si elle est active, sinon la première option active
+// (-1 si toutes sont désactivées : le groupe n'est alors pas atteignable)
 const focusIndex = computed(() => {
-  const i = props.options.findIndex(isSelected)
-  return i >= 0 ? i : Math.max(0, props.options.findIndex((o) => !o.disabled))
+  const i = props.options.findIndex((o) => isSelected(o) && !o.disabled)
+  return i >= 0 ? i : props.options.findIndex((o) => !o.disabled)
 })
 
 function select(option) {
