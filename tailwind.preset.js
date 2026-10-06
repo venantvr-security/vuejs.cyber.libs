@@ -1,4 +1,4 @@
-// tailwind.preset.js — thème partagé CYBER-NEXUS / CTI-NEXUS
+// tailwind.preset.js — thème partagé NEXUS (CYBER-NEXUS, CTI-NEXUS, DEPLOY-NEXUS)
 import plugin from 'tailwindcss/plugin'
 
 // Palettes Tailwind v3 (triplets RGB) pilotées par variables CSS.
@@ -51,9 +51,10 @@ const themeVariables = plugin(({ addBase }) => {
 const glow = rgb => `0 0 20px -3px rgba(${rgb}, 0.35)`
 
 // Chemin à ajouter au `content` des apps pour que Tailwind scanne les composants partagés
-export const cyberLibsContent = './node_modules/vuejs.cyber.libs/components/**/*.vue'
+export const nexusLibsContent = './node_modules/vuejs.libs.nexus/components/**/*.vue'
+export const cyberLibsContent = nexusLibsContent
 
-export default {
+export const nexusPreset = {
   darkMode: 'class',
   theme: {
     extend: {
@@ -107,3 +108,7 @@ export default {
   },
   plugins: [themeVariables],
 }
+
+export const nexusVisualsPreset = nexusPreset
+export const cyberVisualsPreset = nexusPreset
+export default nexusPreset

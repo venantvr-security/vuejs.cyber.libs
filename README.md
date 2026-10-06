@@ -1,181 +1,302 @@
-# vuejs.cyber.libs
+# vuejs.libs.nexus
 
-Bibliothèque partagée de CYBER-NEXUS et CTI-NEXUS : thème Tailwind, styles communs, composants d'affichage, services.
+Bibliothèque partagée officielle de l'écosystème **NEXUS** :
+- **CYBER-NEXUS** (`vuejs.cyber.nexus`) : Gestion de crise cyber, gouvernance SSI & comitologie.
+- **CTI-NEXUS** (`vuejs.cti.nexus`) : Cyber Threat Intelligence, analyse de la menace, matrices opérationnelles & ROI.
+- **DEPLOY-NEXUS** (`vuejs.deploy.nexus`) : Déploiement de sécurité opérationnelle en environnement complexe (PSSI, durcissement, segmentation, supervision SOC/SIEM, PCA/PRA).
+
+Elle rassemble le thème Tailwind v3 unifié, les styles visuels, un ensemble complet de 24 composants Vue 3 accessibles, les services vocaux et les moteurs d'arbitrage/évaluation (Gemini + fallback local).
+
+Conçue selon les principes de préservation de la propriété intellectuelle : **aucun libellé métier en dur**, externalisation totale via props, slots et fonctions d'i18n `t('...')` sans valeur par défaut codée en dur.
+
+---
+
+## Sommaire
+
+1. [Installation](#installation)
+2. [Thème Tailwind](#thème-tailwind)
+3. [Styles & Design System](#styles--design-system)
+4. [Catalogue des Composants (24)](#catalogue-des-composants-24)
+5. [Services Vocaux](#services-vocaux)
+6. [Profils d'Acteurs & Analyse Lexicale](#profils-dacteurs--analyse-lexicale)
+7. [Moteurs Applicatifs (Gemini + Local)](#moteurs-applicatifs-gemini--local)
+8. [Propriété Intellectuelle & Bonnes Pratiques](#propriété-intellectuelle--bonnes-pratiques)
+
+---
 
 ## Installation
 
 ```bash
-npm install git+https://github.com/venantvr-security/vuejs.cyber.libs.git
+npm install git+https://github.com/venantvr-security/vuejs.libs.nexus.git
 ```
 
-## Thème Tailwind
+Dans le `package.json` de votre application :
 
-`tailwind.config.js` de l'application :
-
-```js
-import cyberVisualsPreset, { cyberLibsContent } from 'vuejs.cyber.libs/tailwind.preset.js'
-
-export default {
-  presets: [cyberVisualsPreset],
-  content: ['./index.html', './src/**/*.{vue,js,ts,jsx,tsx}', cyberLibsContent],
+```json
+"dependencies": {
+  "vuejs.libs.nexus": "github:venantvr-security/vuejs.libs.nexus"
 }
 ```
 
-Le preset fournit :
-- les palettes `slate`, `cyan`, `emerald`, `amber`, `rose`, `purple`, `violet`, `blue`, `indigo` pilotées par variables CSS (mode jour automatique via `html.light`) ;
-- l'échelle typographique relevée (`xs` 13px, `sm` 15px, `base` 16px) ;
-- les familles `font-sans` / `font-heading` (Inter) et `font-mono` (JetBrains Mono) ;
-- les ombres `shadow-glow-{cyan,emerald,success,amber,warning,rose,danger,purple}`.
+---
 
-## Styles
+## Thème Tailwind
 
-`src/style.css` de l'application, avant les directives Tailwind :
+Dans le fichier `tailwind.config.js` de l'application cliente :
+
+```javascript
+import { nexusPreset, nexusLibsContent } from 'vuejs.libs.nexus/tailwind.preset.js'
+
+export default {
+  presets: [nexusPreset],
+  content: [
+    './index.html',
+    './src/**/*.{vue,js,ts,jsx,tsx}',
+    nexusLibsContent,
+  ],
+}
+```
+
+> **Note de compatibilité :** L'export par défaut ainsi que l'alias historique `cyberVisualsPreset` demeurent disponibles pour préserver la rétrocompatibilité.
+
+### Capacités du Preset
+
+- **Palettes dynamiques** : `slate`, `cyan`, `emerald`, `amber`, `rose`, `purple`, `violet`, `blue`, `indigo` pilotées par variables CSS (triplets RGB), inversées automatiquement en mode jour via la classe `html.light`.
+- **Palette applicative `cyber`** : nuances `cyber-50` à `cyber-950`, teintes sémantiques `cyber-dark`, `cyber-card`, `cyber-panel`, `cyber-border`, `cyber-accent`, `cyber-highlight`, `cyber-danger`, `cyber-warning`.
+- **Échelle typographique relevée (Accessibilité WCAG)** :
+  - `tiny` : 12px (réservé aux micro-badges)
+  - `xs` : 13px (libellés secondaires, méta-données)
+  - `sm` : 15px (corps de texte par défaut)
+  - `base` : 16px (titres intermédiaires, mise en avant)
+- **Typographies** :
+  - `font-sans` / `font-heading` : Inter
+  - `font-mono` : JetBrains Mono
+- **Ombres néon / Glows** : `shadow-glow-{cyan,emerald,success,amber,warning,rose,danger,purple}`.
+
+---
+
+## Styles & Design System
+
+Importer la feuille globale dans `src/style.css` **avant** les directives Tailwind :
 
 ```css
-@import 'vuejs.cyber.libs/styles/index.css';
+@import 'vuejs.libs.nexus/styles/index.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 ```
 
-| Fichier | Contenu |
-|---|---|
-| `styles/tokens.css` | variables CSS (couleurs, ombres, polices) |
-| `accessibility.css` | socle typographique, focus, sélection, `.cyber-container` (CSS pur, importable seul) |
-| `styles/base.css` | fond de page, titres, chiffres tabulaires |
-| `styles/components.css` | `glass-panel*`, barres de défilement, primitives `cn-*` |
-| `styles/animations.css` | `animate-radar`, `animate-float`, `animate-fade-in` |
-| `styles/theme-light.css` | mode jour (`html.light`) |
+### Architecture des feuilles de style
 
-Polices à charger dans `index.html` :
+| Fichier | Description |
+|---|---|
+| `styles/tokens.css` | Variables CSS racines (nuanciers RGB, ombres, polices). |
+| `accessibility.css` | Socle typographique, contraste WCAG, anneaux de focus clavier (`.cn-focus`), sélection, `.cyber-container`. |
+| `styles/base.css` | Fond de page sombre, titres, chiffres tabulaires. |
+| `styles/components.css` | Panneaux vitrés `glass-panel*`, barres de défilement stylisées, primitives `cn-*`. |
+| `styles/animations.css` | `animate-radar`, `animate-float`, `animate-fade-in`. |
+| `styles/theme-light.css` | Adaptation des variables de surface et d'accent pour le mode jour (`html.light`). |
+
+Polices Google Fonts recommandées dans `index.html` :
 
 ```html
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&family=JetBrains+Mono:wght@400..700&display=swap" rel="stylesheet">
 ```
 
-### Primitives `cn-*`
+### Primitives CSS `cn-*`
 
 | Classe | Usage |
 |---|---|
-| `cn-section-title`, `cn-section-dot` | titre de section en capitales + pastille |
-| `cn-page-title`, `cn-page-subtitle` | titre et chapeau de vue |
-| `cn-card`, `cn-inset` | carte vitrée, encart |
-| `cn-body`, `cn-meta` | texte courant (`text-sm`), méta (`text-xs`) |
-| `cn-pill` + `cn-pill-{cyan,emerald,amber,rose,violet,slate,blue,purple}` | pastille de statut |
-| `cn-chip`, `cn-chip-active` | puce de filtre / onglet compact |
-| `cn-focus` | anneau de focus clavier (déjà inclus dans boutons, onglets, puces) |
-| `cn-seg`, `cn-seg-item`, `cn-seg-item-active` | contrôle segmenté |
-| `cn-btn`, `cn-btn-primary`, `cn-btn-ghost`, `cn-btn-danger`, `cn-icon-btn`, `cn-icon-btn-sm` | boutons |
-| `cn-input`, `cn-label` | champs de formulaire |
-| `cn-bubble-user`, `cn-bubble-actor`, `cn-bubble-system` | bulles de chat |
-| `cn-tab`, `cn-tab-active`, `cn-tab-mobile`, `cn-tab-mobile-active` | navigation principale |
-| `cn-table-wrap`, `cn-table` | tableaux |
+| `cn-section-title`, `cn-section-dot` | Titre de section en capitales + pastille lumineuse. |
+| `cn-page-title`, `cn-page-subtitle` | En-tête principal et chapeau descriptif d'une vue. |
+| `cn-card`, `cn-inset` | Carte vitrée translucide, encart secondaire. |
+| `cn-body`, `cn-meta` | Texte courant (`text-sm`), méta-données compactes (`text-xs`). |
+| `cn-pill` + `cn-pill-{cyan,emerald,amber,rose,violet,slate,blue,purple}` | Pastille de statut ou badge compact. |
+| `cn-chip`, `cn-chip-active` | Puce de filtrage ou onglet discret. |
+| `cn-seg`, `cn-seg-item`, `cn-seg-item-active` | Sélecteur segmenté accessible. |
+| `cn-btn`, `cn-btn-primary`, `cn-btn-ghost`, `cn-btn-danger` | Boutons d'action standards. |
+| `cn-icon-btn`, `cn-icon-btn-sm` | Boutons carrés pour icônes d'action. |
+| `cn-input`, `cn-label` | Champs de formulaire et libellés associés. |
+| `cn-bubble-user`, `cn-bubble-actor`, `cn-bubble-system` | Bulles de dialogue dans les simulateurs. |
+| `cn-tab`, `cn-tab-active`, `cn-tab-mobile`, `cn-tab-mobile-active` | Onglets de navigation principale desktop & mobile. |
+| `cn-table-wrap`, `cn-table` | Conteneur avec défilement horizontal et tableau stylisé. |
+| `cn-focus` | Anneau de focus visible pour navigation clavier conforme WCAG. |
 
-Règle typographique : texte courant en `text-sm`, `text-xs` réservé aux libellés, horodatages et pastilles ; titres en `font-heading`.
+---
 
-## Composants
+## Catalogue des Composants (24)
 
-Aucun texte n'est codé en dur : tout passe par props et slots (les applications gèrent l'i18n).
+Les composants sont conçus pour être universels : ils n'embarquent **aucun texte applicatif en dur**. Tous les libellés sont injectés par props ou slots (internationalisation `t('...')` déléguée aux applications clientes).
 
-- `components/CyberModal.vue` : coque de modale (fond, panneau, en-tête, fermeture Échap/clic, pied).
-- `components/CyberPageHeader.vue` : en-tête de vue (pastille, icône, titre, chapeau, actions) ; prop `as` (`h1` par défaut, `h2`, `h3`).
-- `components/CyberGauge.vue` : jauge de score (icône, titre, sous-titre, barre `role="progressbar"`, pied en slot par défaut ; props `value`, `max`, `unit`, `accent`, `badgeClass`).
-- `components/CyberNavTabs.vue` : navigation principale (rail desktop défilant + grille mobile) depuis une liste `items` (`id`, `label`, `mobileLabel`, `icon`, `iconClass`, `title`, `badge`, `badgeClass`, `accent`) ; `v-model` = vue active ; slot `desktop-end`.
-- `components/CyberVoiceButton.vue` : lecture / arrêt de synthèse vocale (`speechId`, `text`, `voice`, `playLabel`, `stopLabel`, `showLabel`, `size`) ; masqué si le navigateur ne la supporte pas.
-- `components/CyberDictationButton.vue` : bouton micro de dictée (`listening`, `supported`, `startLabel`, `stopLabel`, `unsupportedLabel`, `showLabel`) ; émet `toggle`.
-- `components/CyberInlineAlert.vue` : message d'erreur en ligne (`role="alert"`, `tone`, `dismissLabel`) ; émet `dismiss`.
-- `components/CyberSegmented.vue` : choix unique (contrôle segmenté `variant="seg"` ou puces `variant="chip"`, `scroll` pour un rail) avec sémantique radiogroup et navigation aux flèches ; `options` (`value`, `label`, `icon`, `title`, `count`, `disabled`, `class`, `activeClass`) ; `v-model` ; slot `option`.
-- `components/CyberStatTile.vue` : tuile de chiffre clé (`accent`, `variant` `card` | `inset`) ; slots `label`, défaut (valeur), `hint`, `icon`.
-- `components/CyberEmptyState.vue` : état vide (`compact`) ; slots `icon`, `title`, défaut (message), `actions`.
-- `components/CyberScrollRail.vue` : barre horizontale défilante pour les menus larges. Des contrôles apparaissent à gauche et à droite quand du contenu est masqué : survol = défilement continu, clic = une page ; molette verticale convertie en horizontal ; l'élément actif (`aria-current="page"`, `.cn-tab-active`…) est ramené dans la vue. Props : `track-class` (gap/alignement de la piste), `fade-class` (dégradé accordé au fond, ex. `from-slate-800 via-slate-800/80 to-transparent` dans une modale), `speed` (px/s), `wheel`.
-- `components/CyberAccordion.vue` : accordéon `<details>`.
-- `components/CyberTermTooltip.vue` : infobulle du lexique au survol.
+### 1. Navigation & Marque
 
-## Services
+- **`CyberBrand.vue`** : Bloc d'identité de marque Nexus avec logo bouclier dégradé, titre contrasté, pastille sous-titre et description facultative.
+  - *Props :* `title`, `subtitle`, `description`.
+- **`CyberPageHeader.vue`** : En-tête de vue standardisé avec pastille d'état, titre hiérarchisé (`as: 'h1' | 'h2' | 'h3'`), chapeau et slot d'actions.
+  - *Props :* `title`, `subtitle`, `badge`, `as`, `icon`. *Slots :* `actions`, `badge`, `default`.
+- **`CyberNavTabs.vue`** : Navigation principale réactive avec rail horizontal défilant sur desktop et grille compacte sur mobile.
+  - *Props :* `items` (`id`, `label`, `mobileLabel`, `icon`, `badge`, `badgeClass`, `accent`), `modelValue` (onglet actif). *Slots :* `desktop-end`.
+- **`CyberScrollRail.vue`** : Rail horizontal fluide avec défilement continu au survol des chevrons, défilement par page au clic et conversion de la molette verticale en axe horizontal.
+  - *Props :* `trackClass`, `fadeClass`, `speed`, `wheel`. *Slots :* `default`.
+- **`CyberSidebarRailText.vue`** : Libellé vertical décoratif (`writing-mode: vertical-rl`) pour séparateurs visuels et rails latéraux.
+  - *Props :* `text`.
+- **`CyberFooter.vue`** : Pied de page standardisé minimaliste avec bordure supérieure et slot de contenu.
 
-- `services/voiceService.js` : synthèse et dictée vocales.
+### 2. Panneaux, Modales & Conteneurs
 
-## Profils de parties prenantes et moteurs
+- **`CyberModal.vue`** : Fenêtre modale accessible avec fond semi-transparent flouté, panneau centré, capture de la touche Échap et fermeture au clic extérieur.
+  - *Props :* `title`, `subtitle`, `badge`, `maxWidth`, `closeLabel`. *Slots :* `header-actions`, `default`, `footer`.
+- **`CyberCardCollapsible.vue`** : Carte vitrée repliable avec en-tête cliquable, chevron rotatif animé, bouton aria et slot d'actions préservé.
+  - *Props :* `collapsed`, `headerClass`, `t`. *Slots :* `header`, `actions`, `default`.
+- **`CyberAccordion.vue`** : Accordéon basé sur la balise native `<details>` stylisée avec chevron rotatif et respect de l'accessibilité.
+  - *Props :* `title`, `open`, `badge`. *Slots :* `default`.
+- **`CyberEmptyState.vue`** : Écran d'état vide avec icône thématique, titre, description et boutons d'actions.
+  - *Props :* `compact`. *Slots :* `icon`, `title`, `default`, `actions`.
 
-`services/stakeholderProfile.js` (réexporté par `index.js`) lit un objet `profile` facultatif sur chaque acteur de `data/actors.js`. Le même profil alimente la War Room (routage des interpellations, réactions locales), le coach Tech-to-Board et les prompts Gemini.
+### 3. Matrices & Outils Métier Cybersécurité
 
-```js
-profile: {
-  aliases: ['julien', 'rssi'],                       // interpellations reconnues
-  mandate: 'Garant de la PSSI, prépare le dossier d\'homologation',
-  decisionRights: { decides: [], vetoes: ['mise en production sans FARR'], advises: ['homologation'] },
-  stakes: ['conformité HDS', 'traçabilité des dérogations'],
-  evaluationCriteria: ['mesure compensatoire datée', 'risque résiduel formalisé'],
-  expectations: [{ label: 'FARR signée et datée', terms: ['farr', 'acceptation du risque'] }],
-  redLines: [{ label: 'dérogation sans échéance', terms: ['sans échéance', 'indéfiniment'] }],
-  jargonTolerance: 'high',                            // low | medium | high
-  regulatoryFocus: ['RGPD art. 32', 'référentiel HDS 2024'],
-  communicationStyle: 'factuel, demande des preuves écrites'
-}
+- **`CyberAdmiraltyMatrix.vue`** : Matrice de cotation du renseignement selon le code de l'Amirauté (OTAN STANAG 2511) croisant la fiabilité de la source (A–F) et la crédibilité de l'information (1–6). Supporte la sélection interactive (`v-model`), le zonage couleur et la légende personnalisée.
+  - *Props :* `modelValue`, `interactive`, `reliabilityLabels`, `credibilityLabels`, `rowAxisLabel`, `colAxisLabel`, `legend`.
+- **`CyberRaciMatrix.vue`** : Matrice RACI interactive (activités × rôles). Propose le filtrage par rôle spécifique, le filtrage par lettre R/A/C/I, la colonne de justification managériale et le défilement horizontal optimisé.
+  - *Props :* `activities`, `roles`, `roleLabel`, `activityLabel`, `hasRationale`, `t`.
+- **`CyberActorCard.vue`** : Carte d'évaluation d'une partie prenante / acteur de comitologie. Affiche l'avatar, l'indicateur d'humeur en direct, les boutons de changement de tempérament (coopératif, exigeant, hostile), les jauges psychologiques (agacement, confiance, stress, ouverture) et la synthèse vocale intégrée.
+  - *Props :* `actor`, `t`. *Événements :* `changePreset`.
+
+### 4. Indicateurs & Données Chiffrées
+
+- **`CyberGauge.vue`** : Jauge de métrique ou de score avec barre de progression sémantique (`role="progressbar"`), calcul de pourcentage, accents colorés et zone de pied personnalisable.
+  - *Props :* `value`, `max`, `unit`, `accent`, `badgeClass`, `icon`. *Slots :* `default`.
+- **`CyberStatTile.vue`** : Tuile d'indicateur clé de performance (KPI) avec variante carte ou encart, valeur principale contrastée et slot d'indice/variation.
+  - *Props :* `accent`, `variant` (`card` | `inset`). *Slots :* `label`, `default`, `hint`, `icon`.
+- **`CyberFormulaTooltip.vue`** : Infobulle interactive décomposant les étapes d'un calcul (lignes de décomposition `+`, `-`, `=`, sous-totaux et formule explicative).
+  - *Props :* `lines` (`[{ op, label, value }]`), `formula`, `triggerLabel`. *Slots :* `title`, `default`.
+- **`CyberTermTooltip.vue`** : Infobulle au survol pour termes techniques et concepts du lexique.
+  - *Props :* `term`, `definition`.
+
+### 5. Marquage TLP (Traffic Light Protocol 2.0)
+
+- **`CyberTlpBadge.vue`** : Badge normé TLP 2.0 (`RED`, `AMBER+STRICT`, `AMBER`, `GREEN`, `CLEAR`) avec code couleur officiel et style adapté.
+  - *Props :* `level`, `t`.
+- **`CyberTlpText.vue`** : Composant de rendu de texte qui détecte automatiquement les occurrences `TLP:XXX` dans une chaîne brute et les remplace inline par des `CyberTlpBadge`.
+  - *Props :* `text`.
+
+### 6. Contrôles Interactifs & Formulaires
+
+- **`CyberSegmented.vue`** : Contrôle de sélection unique accessible (`role="radiogroup"`) avec navigation aux flèches clavier, variante segmentée compacte (`variant="seg"`) ou puces (`variant="chip"`), et support du défilement horizontal.
+  - *Props :* `options`, `modelValue`, `variant`, `scroll`.
+- **`CyberInlineAlert.vue`** : Alerte en ligne contextuelle (`role="alert"`) avec nuance de ton (`danger`, `warning`, `info`, `success`) et bouton de fermeture.
+  - *Props :* `tone`, `dismissLabel`. *Événements :* `dismiss`.
+
+### 7. Accessibilité Vocale
+
+- **`CyberVoiceButton.vue`** : Bouton de lecture / arrêt par synthèse vocale (Web Speech API). Masquage automatique si le navigateur n'est pas compatible.
+  - *Props :* `speechId`, `text`, `voice`, `playLabel`, `stopLabel`, `showLabel`, `size`.
+- **`CyberDictationButton.vue`** : Bouton micro pour dictée vocale dans un champ de saisie avec animation d'écoute.
+  - *Props :* `listening`, `supported`, `startLabel`, `stopLabel`, `unsupportedLabel`, `showLabel`. *Événements :* `toggle`.
+- **`CyberFocusDictation.vue`** : Micro de dictée « flottant » à monter une seule fois à la racine de l'application (`App.vue`). Il détecte automatiquement le champ texte ayant le focus dans toute l'application et y attache un bouton de dictée vocale sans intrusion dans le layout.
+  - *Props :* `startLabel`, `stopLabel`.
+
+---
+
+## Services Vocaux
+
+Le module `services/voiceService.js` fournit des composables Vue 3 réactifs avec arrêt automatique au démontage du composant (`onScopeDispose`) :
+
+```javascript
+import {
+  useVoiceSynthesis,
+  useVoiceDictation,
+  isSpeechSynthesisSupported,
+  isSpeechRecognitionSupported,
+} from 'vuejs.libs.nexus/services/voiceService.js'
+
+// Synthèse vocale
+const { isSpeaking, speak, stop } = useVoiceSynthesis()
+speak('Alerte de sécurité', { voice: 'fr-FR' })
+
+// Dictée vocale
+const { isListening, transcript, error, start, stop: stopDictation } = useVoiceDictation({
+  onResult: (text) => console.log('Dicté :', text),
+})
 ```
 
-Les `terms` sont des radicaux reconnus en début de mot (`containsTerm(text, term, { prefix: true })`) ; les unités collées à un nombre sont reconnues (« 150k€ », « 72h »). Un groupe peut porter un `impact` propre à l'application, renvoyé par `assessAgainstStakeholder` (`redLineGroups`, `expectationGroups`). Un groupe sans `label` est évalué mais n'apparaît ni dans le feedback ni dans les prompts.
+---
 
-### Normalisation
+## Profils d'Acteurs & Analyse Lexicale
 
-`normalize(s)` (exporté) est appliquée au texte **et** aux termes avant toute comparaison (`containsTerm`, `matchTermGroups`, `findMentionedActors`, jargon du coach) :
+Le module `services/stakeholderProfile.js` permet d'analyser le discours d'un apprenant ou d'un utilisateur par rapport aux attentes, lignes rouges et tolérance au jargon d'un décideur :
 
-- minuscules, décomposition NFKD et suppression des diacritiques (`réseau` = `reseau` = `RÉSEAU`), le `€` est conservé ;
-- apostrophes typographiques (’ ‘ ʼ ´ et accent grave) → apostrophe droite ; espaces insécables et fines → espace ; traits d'union → espace (`pare-feu` = `pare feu`) ; espaces répétées réduites (les retours à la ligne sont conservés : ils séparent les propositions) ;
-- unités recollées au nombre : `72 h` → `72h`, `150 k€` → `150k€`, `30 %` → `30%` (`72 heures` reste tel quel) ;
-- articles : `art.33`, `art. 33` → `art 33`.
+```javascript
+import {
+  normalize,
+  containsTerm,
+  matchTermGroups,
+  assessAgainstStakeholder,
+} from 'vuejs.libs.nexus'
 
-### Négation
+// 1. Normalisation résistante (minuscules, diacritiques, unités '72h'/'150k€', ponctuations)
+const clean = normalize("Déploiement d'un pare-feu sous 72 h !") // -> "deploiement d un pare feu sous 72h !"
 
-`containsTerm(text, term, { prefix, affirmedOnly: true })` ignore une occurrence niée. La négation est **limitée à la proposition** du terme : elle s'arrête à `, : ; . ! ? …`, au retour à la ligne, aux tirets `— –` et aux connecteurs `mais`, `donc`, `alors`, `puis`, `cependant`, `toutefois`, `néanmoins`, `pourtant`.
+// 2. Détection lexicale avec proposition niée
+const hasFirewall = containsTerm(clean, 'pare feu', { affirmedOnly: true })
 
-- Négateurs locaux (au plus 3 mots avant le terme) : `sans`, `pas`, `ni`, `aucun(e)`, `jamais`, `rien`, `zéro`, `nullement`, `guère`, `point`, `ne`/`n'`, `éviter`, `refuser`, `renoncer`, `exclure`, `plutôt que`, `au lieu de`, et `non` juste avant le terme (`non-conformité`).
-- Négateurs de proposition (au plus 8 mots avant) : `hors de question`, `en aucun cas`, `pas question`, `exclu(e)(s)`, `proscrit(e)(s)`, `interdit(e)(s)`, `inutile (de)`, `nullement`.
-- Condamnation après le terme (au plus 4 mots) : `… est/serait exclu(e), proscrit(e), interdit(e), illégal(e), contraire, inacceptable, une erreur`, `… nous/vous exposerait`.
-- Ne sont **pas** des négations : `sans attendre / délai / tarder / plus attendre / doute / faute / exception`, `pas de doute / panique / souci / problème`, `aucun doute`, `pas seulement`, `non seulement`, `plus que jamais`, `si jamais`, `pas à pas`, `n'importe`, `zéro trust / day`, `ne … que` (restriction), la double négation (`ne pouvons pas ne pas couper`), `ne pas oublier / omettre / négliger` ; les compléments de temps (`à ce stade`, `à ce jour`, `pour l'instant`, `en l'état`…) ne sont jamais niés.
-- Un terme qui commence par `ne pas` tolère deux mots intercalés : `ne pas notifier` reconnaît `il ne faut surtout pas notifier`.
-
-### Groupes de termes : `negatable` et `exceptWhen`
-
-```js
-{ label: 'Couper le courant', terms: ['couper le courant'], negatable: true }
-{ label: 'Report sans alternative ni date', terms: ['annuler le lancement'], exceptWhen: ['lundi', 'jeudi', 'h', 'date'] }
+// 3. Évaluation par rapport aux attentes et lignes rouges d'un profil
+const assessment = assessAgainstStakeholder(learnerText, stakeholderProfile)
 ```
 
-- `negatable` : `true` par défaut pour tous les groupes (attentes, `mustConvey`, lignes rouges, pièges) : la bonne réponse est souvent la forme niée de la faute (« nous ne publierons pas les IoC en TLP:CLEAR »). Écrire les lignes rouges comme des intentions fautives, et mettre `negatable: false` sur un groupe dont toute mention doit être sanctionnée.
-- `exceptWhen` : termes qui, dans la même phrase que l'occurrence, l'annulent (« reporter à jeudi 8h » n'est pas un report sans date).
-- `matchTermGroups(text, groups, { negatable })` : valeur par défaut pour les groupes sans drapeau (`true`).
-- `assessAgainstStakeholder(text, actor, { redLinesNegatable })` : `true` par défaut ; `false` rend toutes les lignes rouges sans drapeau insensibles à la négation.
+---
 
-Pour un moteur applicatif : `containsTerm(text, term, { prefix: true, affirmedOnly: true })` pour un signal positif (« propose », « déploie »), `containsTerm(text, term, { prefix: true })` pour un signal à détecter quelle que soit la forme.
+## Moteurs Applicatifs (Gemini + Local)
 
-### Coach Tech-to-Board
+### 1. `WarRoomEngine`
 
-Cas (`TechToBoardEngine.evaluateAnswer({ text, caseStudy, stakeholder })`) : `context`, `technicalFact`, `decisionQuestion`, `idealAnswer`, `mustConvey` et `pitfalls` (groupes de termes), `jargonWords`, `businessWords`, `actionWords`, `keywordsToInclude`. `caseStudy` nul est traité comme `{}`.
+Moteur de simulation de tour de table en cellule de crise. Il sollicite l'API Gemini avec clé passée en en-tête `x-goog-api-key` (délai de 20s, bascule multi-modèles `gemini-2.5-flash` → `gemini-2.5-flash-lite` → `gemini-2.0-flash`) et valide strictement les répliques et deltas d'impact. En cas d'échec ou d'absence de clé, il bascule sur le simulateur local sans interruption de service.
 
-Barème local (`evaluateLocally`) :
+```javascript
+import { WarRoomEngine } from 'vuejs.libs.nexus'
 
-- bonus plafonnés par catégorie : faits transmis +5 chacun (max +20), attentes du décideur +4 chacune (max +16), mots-clés du cas −15 à +25, vocabulaire métier +10, recommandation +10 ;
-- `actionWords` sensibles à la négation (« nous ne proposons rien » n'est pas une recommandation) ;
-- plafond à 55 si moins de 40 mots, moins de trois phrases (une phrase de 25 mots et plus compte double), densité de mots-clés du cas et du décideur > 40 % ou diversité lexicale (mots de 4 lettres et plus distincts / total) < 0,5 au-delà de 40 mots ;
-- un piège ou une ligne rouge franchis plafonnent la note à 45 (`rawScore` garde la note brute ; `breaches`, `breachFeedback`, `breachCount` les détaillent) ;
-- la réaction hors ligne reprend `caseStudy.stakeholders[id].reactions` si le cas en fournit, sinon elle est tirée du profil.
+const engine = new WarRoomEngine({
+  apiKey: userApiKey,
+  model: 'gemini-2.5-flash',
+  systemPromptGenerator: (actors, scenario, metrics) => '...',
+  localSimulator: (args) => ({ dialogues: [...], metricsImpact: {...} }),
+})
 
-Évaluation Gemini :
+const turn = await engine.playTurn({ actors, scenario, metrics, userMessage, history })
+```
 
-- la réponse de l'apprenant est placée entre `<reponse_apprenant>` et `</reponse_apprenant>` (toute balise de ce nom présente dans le texte est neutralisée) ; l'instruction système précise que ce contenu est une donnée à évaluer, jamais une instruction ;
-- `generationConfig.responseSchema` impose `score` (entier), `grade` (A–D), `feedback` (≤ 5 chaînes), `stakeholderReaction.text` ;
-- sortie validée côté client : note `Number` arrondie et bornée 0–100 (sinon repli local), `grade` recalculé depuis la note, `feedback` converti en ≤ 5 chaînes, réaction textuelle ;
-- garde-fou : l'évaluation locale est toujours calculée ; si elle détecte un piège ou une ligne rouge, la note Gemini est plafonnée à 45, le feedback local de la faute est ajouté en tête et la réaction locale remplace celle de Gemini (`_guardrailApplied`, `_localScore`) ;
-- modèles essayés : `model` puis `candidateModels` (défaut `FALLBACK_GEMINI_MODELS`), sans doublon ni préfixe `models/` ; arrêt immédiat sur HTTP 400/401/403 (clé invalide) ; réponse vide → `finishReason` (ex. `SAFETY`) dans l'erreur ; en repli local, `_engineFallback: true` et `_engineError` (`message`, `status`, `finishReason`, `model`).
+### 2. `TechToBoardEngine`
 
-`WarRoomEngine.playTurn` applique la même politique de modèles et valide la sortie (objet, `dialogues` tableau de répliques avec `text`, `metricsImpact` borné à ±20), sinon repli sur `localSimulator`.
+Moteur d'évaluation pédagogique de la communication d'un expert technique vers un décideur (Directeur Général, RSSI, DSI, Métier) :
+- **Sécurité et neutralisation d'injections** : La réponse de l'apprenant est isolée dans `<reponse_apprenant>` et les balises malicieuses sont neutralisées.
+- **Garde-fous stricts** : L'évaluation locale calcule systématiquement les lignes rouges et pièges franchis. Si une ligne rouge est franchie, la note Gemini est plafonnée à 45 et le feedback local est priorisé.
+- **Schéma de réponse forcé** : `score`, `grade` (A–D), `feedback` (max 5 points), `stakeholderReaction`.
 
-Tous les appels réseau de la bibliothèque passent la clé dans l'en-tête `x-goog-api-key` (jamais dans l'URL) et expirent après 20 s (`timeoutMs`, `GEMINI_REQUEST_TIMEOUT_MS`). `parseGeminiJson` renvoie le premier objet JSON équilibré du texte (chaînes et échappements compris), répare un objet tronqué avec `jsonrepair` et lève une erreur si aucun objet n'est récupérable.
+```javascript
+import { TechToBoardEngine } from 'vuejs.libs.nexus'
 
-### Voix
+const coach = new TechToBoardEngine({ apiKey: userApiKey })
+const report = await coach.evaluateAnswer({
+  text: learnerPitch,
+  caseStudy: currentCase,
+  stakeholder: selectedStakeholder,
+})
+```
 
-`useVoiceSynthesis` et `useVoiceDictation` s'arrêtent au démontage du composant (`onScopeDispose`) : la dictée ne redémarre plus, la lecture lancée par le composant s'interrompt. `speak()` renvoie `true` si la lecture a démarré.
+---
 
-Fonctions : `containsTerm`, `matchTermGroups`, `findMentionedActors`, `describeStakeholderForPrompt`, `assessAgainstStakeholder`, `normalize`, `parseGeminiJson`, constantes `DEFAULT_GEMINI_MODEL`, `FALLBACK_GEMINI_MODELS`, `GEMINI_REQUEST_TIMEOUT_MS`.
+## Propriété Intellectuelle & Bonnes Pratiques
+
+Pour préserver la sanctuarisation de la propriété intellectuelle lors des échanges et développements :
+
+1. **Aucune chaîne métier en dur** : Tous les composants d'interface de `vuejs.libs.nexus` délèguent leurs textes via props, slots ou la fonction `t('cle_i18n')`.
+2. **Aucune valeur par défaut traduisible** : Les appels `t('key')` dans les templates ne doivent comporter aucun texte français/anglais en dur en second paramètre (ex. `t('btn_submit')` et NON `t('btn_submit', 'Valider')`).
+3. **Fichiers de cadrage IA** : Chaque projet de l'écosystème Nexus intègre son fichier `CLAUDE.md` et `.claude/settings.json` interdisant la réinjection ou la dispersion de contenus pédagogiques confidentiels.
+
+---
+
+## Licence & Équipe
+
+Projet interne — **Nexus Security Suite** (CYBER-NEXUS, CTI-NEXUS, DEPLOY-NEXUS).
+Dépôt : [https://github.com/venantvr-security/vuejs.libs.nexus.git](https://github.com/venantvr-security/vuejs.libs.nexus.git)

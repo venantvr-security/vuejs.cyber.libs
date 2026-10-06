@@ -747,4 +747,5 @@ ${neutralizeLearnerText(text)}
     return local
   }
 }
-export { default as cyberVisualsPreset } from './tailwind.preset.js'
+
+export { default, default as nexusPreset, default as nexusVisualsPreset, default as cyberVisualsPreset, nexusLibsContent, cyberLibsContent } from './tailwind.preset.js'
