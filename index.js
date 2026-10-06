@@ -293,16 +293,19 @@ export class TechToBoardEngine {
     const pitfalls = matchTermGroups(lower, caseStudy.pitfalls)
     score -= pitfalls.met.length * 15
     pitfalls.met.forEach((label) => feedback.push(`⚠️ À proscrire : ${label}.`))
+    const breaches = [...pitfalls.met]
 
     // 4. Attentes et lignes rouges du décideur
+    let assessment = null
     if (stakeholder) {
-      const assessment = assessAgainstStakeholder(lower, stakeholder)
+      assessment = assessAgainstStakeholder(lower, stakeholder)
       score += assessment.expectationsMet.length * 4
       if (assessment.expectationsMissed.length) {
         feedback.push(`💡 ${stakeholder.name} attend aussi : ${assessment.expectationsMissed.join(', ')}.`)
       }
       score -= assessment.redLinesCrossed.length * 15
       assessment.redLinesCrossed.forEach((label) => feedback.push(`⛔ Ligne rouge pour ${stakeholder.name} : ${label}.`))
+      breaches.push(...assessment.redLinesCrossed)
     }
 
     // 5. Une note au décideur se termine par une décision, un délai ou une demande d'arbitrage
@@ -318,17 +321,33 @@ export class TechToBoardEngine {
       feedback.push('⚠️ Réponse trop courte : rédigez faits, impact, niveau de confiance et recommandation.')
     }
 
-    score = Math.max(0, Math.min(100, Math.round(score)))
+    // Un piège ou une ligne rouge franchis empêchent une bonne note, quel que soit le reste
+    const rawScore = Math.round(score)
+    score = Math.max(0, Math.min(100, rawScore))
+    if (breaches.length) score = Math.min(score, 45)
     const grade = score >= 80 ? 'A' : score >= 60 ? 'B' : score >= 40 ? 'C' : 'D'
 
     return {
       score,
+      rawScore,
       grade,
       feedback,
-      stakeholderReaction: { text: 'Intéressant, mais nous devons en rediscuter.' },
+      stakeholderReaction: { text: this.localReaction(score, caseStudy, stakeholder, breaches, assessment) },
       dgReaction: "Merci pour ce point, nous allons l'analyser.",
       _engineFallback: true
     }
+  }
+
+  // Réaction hors ligne : celle rédigée pour le cas si elle existe, sinon tirée du profil du décideur
+  localReaction(score, caseStudy, stakeholder, breaches, assessment) {
+    const band = score >= 75 ? 'success' : score >= 50 ? 'neutral' : 'fail'
+    const written = caseStudy.stakeholders?.[stakeholder?.id]?.reactions?.[band]
+    if (written) return written
+    if (breaches.length) return `« ${breaches[0]} : je ne peux pas valider cela en l'état. »`
+    const missing = assessment?.expectationsMissed?.[0]
+    if (band === 'success') return '« Clair et actionnable, je valide la recommandation. »'
+    if (missing) return `« Sur le principe je vous suis, mais il me manque : ${missing.charAt(0).toLowerCase() + missing.slice(1)}. »`
+    return '« Intéressant, mais nous devons en rediscuter. »'
   }
 
   async evaluateAnswer({ text, caseStudy = {}, stakeholder = null }) {

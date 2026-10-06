@@ -115,7 +115,9 @@ profile: {
 }
 ```
 
-Les `terms` sont des radicaux reconnus en début de mot (`containsTerm(text, term, { prefix: true })`). Une ligne rouge s'écrit avec la formulation fautive (« sans FARR »), pas avec le mot seul.
+Les `terms` sont des radicaux reconnus en début de mot (`containsTerm(text, term, { prefix: true })`) ; les unités collées à un nombre sont reconnues (« 150k€ », « 72h »). Les occurrences niées ne comptent pas (« sans FARR », « pas de coupure », « ne notifions pas ») : une ligne rouge dont la faute est une négation s'écrit avec elle (« ne pas notifier »). Un groupe peut porter un `impact` propre à l'application, renvoyé par `assessAgainstStakeholder` (`redLineGroups`, `expectationGroups`).
+
+Dans le coach, un piège ou une ligne rouge franchis plafonnent la note à 45 (`rawScore` garde la note brute) ; la réaction hors ligne reprend `caseStudy.stakeholders[id].reactions` si le cas en fournit, sinon elle est tirée du profil.
 
 Cas du coach (`TechToBoardEngine.evaluateAnswer({ text, caseStudy, stakeholder })`) : `context`, `technicalFact`, `decisionQuestion`, `idealAnswer`, `mustConvey` et `pitfalls` (groupes de termes), `jargonWords`, `businessWords`, `actionWords`, `keywordsToInclude`.
 
