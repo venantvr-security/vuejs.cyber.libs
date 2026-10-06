@@ -119,7 +119,7 @@
         <span class="text-slate-400 flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-slate-500"></span>{{ t('cyber_raci_leg_i') }}</span>
       </div>
       <div>
-        <span class="font-bold text-cyan-300">{{ filteredData.length }}</span> / {{ data.length }} affichées
+        <span class="font-bold text-cyan-300">{{ filteredData.length }}</span> / {{ data.length }} {{ t('cyber_raci_shown') }}
       </div>
     </div>
   </div>
