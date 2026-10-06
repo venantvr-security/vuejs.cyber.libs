@@ -14,7 +14,31 @@ const props = defineProps({
   }
 })
 
-const t = (k, fallback) => props.t(k, fallback);
+const FALLBACK_TRANSLATIONS = {
+  ac_temperament: 'Tempérament',
+  ac_click_force: '(Clic pour forcer)',
+  ac_coop: 'Coopératif',
+  ac_demanding: 'Exigeant',
+  ac_hostile: 'Hostile',
+  ac_fold: 'Déplier/Replier',
+  ac_play_audio: 'Écouter',
+  ac_stop_audio: 'Arrêter',
+  ac_psychology: 'État Psychologique',
+  ac_annoyance: 'Agacement',
+  ac_trust: 'Confiance',
+  ac_stress: 'Stress',
+  ac_openness: 'Ouverture',
+  ac_patience: 'Patience Globale',
+  ac_status_coop: 'Coopérative',
+  ac_status_demanding: 'Sous tension',
+  ac_status_hostile: 'Rupture'
+}
+
+const t = (k, fallback) => {
+  const fb = fallback || FALLBACK_TRANSLATIONS[k] || k
+  const res = props.t(k, fb)
+  return (res === k && FALLBACK_TRANSLATIONS[k]) ? FALLBACK_TRANSLATIONS[k] : (res || fb)
+}
 
 const emit = defineEmits(['changePreset'])
 

@@ -7,15 +7,15 @@
           v-for="item in items"
           :key="item.id"
           type="button"
-          class="cn-tab"
+          class="shrink-0 flex items-center gap-2 px-3 py-2.5 border-b-2 border-transparent text-sm whitespace-nowrap text-slate-400 hover:text-slate-100 hover:bg-slate-800/40 transition-colors cn-focus cn-tab"
           :class="isActive(item) ? ['cn-tab-active', accentOf(item).desktop] : ''"
           :aria-current="isActive(item) ? 'page' : undefined"
           :title="item.title || undefined"
           @click="select(item)"
         >
           <component :is="item.icon" v-if="item.icon" class="w-4 h-4 shrink-0" :class="item.iconClass || iconClass" aria-hidden="true" />
-          <span>{{ item.label }}</span>
-          <span v-if="item.badge" class="cn-pill" :class="[badgeClass, item.badgeClass || 'cn-pill-cyan']">{{ item.badge }}</span>
+          <span class="whitespace-nowrap">{{ item.label }}</span>
+          <span v-if="item.badge" class="cn-pill shrink-0" :class="[badgeClass, item.badgeClass || 'cn-pill-cyan']">{{ item.badge }}</span>
         </button>
       </CyberScrollRail>
       <slot name="desktop-end"></slot>
@@ -27,7 +27,7 @@
         v-for="item in items"
         :key="item.id"
         type="button"
-        class="cn-tab-mobile min-w-0"
+        class="shrink-0 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg border text-xs font-medium whitespace-nowrap transition-all bg-slate-900/70 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 cn-focus cn-tab-mobile min-w-0"
         :class="isActive(item) ? ['cn-tab-mobile-active', accentOf(item).mobile] : ''"
         :aria-current="isActive(item) ? 'page' : undefined"
         :title="item.title || undefined"

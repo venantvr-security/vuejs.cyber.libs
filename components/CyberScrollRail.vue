@@ -2,7 +2,7 @@
   <div class="relative min-w-0">
     <div
       ref="track"
-      class="flex overflow-x-auto no-scrollbar overscroll-x-contain"
+      class="flex flex-row flex-nowrap overflow-x-auto no-scrollbar overscroll-x-contain"
       :class="trackClass"
       @scroll.passive="update"
       @wheel="onWheel"
