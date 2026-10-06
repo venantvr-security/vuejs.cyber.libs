@@ -1,21 +1,37 @@
 import { jsonrepair } from 'jsonrepair'
 
+// La famille gemini-1.5 est retirée : chaque appel échouait et basculait sur le moteur local
+export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
+export const FALLBACK_GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash']
+
+/**
+ * Présence d'un terme en début de mot (insensible à la casse) : évite les faux positifs par
+ * sous-chaîne (« acl » dans « miracle », « red » dans « credential »).
+ * prefix: true accepte les flexions (« bloqué » → « bloquée », « investir » → « investirons »).
+ */
+export function containsTerm(text, term, { prefix = false } = {}) {
+  if (!text || !term) return false
+  const escaped = term.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const end = prefix ? '' : '(?=$|[^\\p{L}\\p{N}])'
+  return new RegExp(`(^|[^\\p{L}\\p{N}])${escaped}${end}`, 'u').test(text.toLowerCase())
+}
+
 export class WarRoomEngine {
   /**
    * Initialise le moteur de War Room.
    * @param {Object} options 
    * @param {string} options.apiKey Clé API Gemini
-   * @param {string} options.model Modèle préféré (ex: 'gemini-2.0-flash')
+   * @param {string} options.model Modèle préféré (ex: 'gemini-2.5-flash')
    * @param {Function} options.systemPromptGenerator Fonction retournant le prompt système
    * @param {Function} options.localSimulator Fonction de fallback si Gemini échoue
    * @param {number} options.maxTokens (Optionnel) Max tokens, defaut 2048
    */
   constructor(options) {
     this.apiKey = options.apiKey
-    this.model = options.model || 'gemini-1.5-flash'
+    this.model = options.model || DEFAULT_GEMINI_MODEL
     this.systemPromptGenerator = options.systemPromptGenerator
     this.localSimulator = options.localSimulator
-    this.candidateModels = options.candidateModels || ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash']
+    this.candidateModels = options.candidateModels || FALLBACK_GEMINI_MODELS
     this.maxTokens = options.maxTokens || 2048
   }
   
@@ -238,7 +254,7 @@ export function parseGeminiJson(rawText) {
 export class TechToBoardEngine {
   constructor(options = {}) {
     this.apiKey = options.apiKey || null
-    this.model = options.model || 'gemini-1.5-flash'
+    this.model = options.model || DEFAULT_GEMINI_MODEL
   }
 
   // Fallback local statique mutualisé
@@ -255,7 +271,7 @@ export class TechToBoardEngine {
       const st = caseStudy?.stakeholders?.[targetStakeholderId] || caseStudy?.stakeholders?.dg;
       const jargon = caseStudy.jargonWords || [];
       let jargonCount = 0;
-      jargon.forEach(w => { if (lower.includes(w.toLowerCase())) jargonCount++ });
+      jargon.forEach(w => { if (containsTerm(lower, w)) jargonCount++ });
       
       if (targetStakeholderId === 'rssi' || targetStakeholderId === 'leaddev') {
         if (jargonCount >= 1) { score += 15; feedback.push("✅ Précision technique adaptée."); }
@@ -268,8 +284,14 @@ export class TechToBoardEngine {
       
       const business = caseStudy.businessWords || [];
       let bCount = 0;
-      business.forEach(w => { if (lower.includes(w.toLowerCase())) bCount++ });
+      business.forEach(w => { if (containsTerm(lower, w, { prefix: true })) bCount++ });
       if (bCount >= 2) { score += 20; feedback.push("✅ Excellente orientation métier et business."); }
+
+      // Une note au décideur doit déboucher sur une action, un délai ou une demande d'arbitrage
+      const actions = caseStudy.actionWords || [];
+      const hasAction = actions.some(w => containsTerm(lower, w, { prefix: true }));
+      if (hasAction) { score += 10; feedback.push("✅ Recommandation actionnable (décision, délai ou arbitrage demandé)."); }
+      else if (actions.length) { score -= 10; feedback.push("💡 Aucune action ni décision explicite : terminez par ce que vous demandez au décideur."); }
       
       // Additional check for length
       if (lower.length < 50) { score -= 20; feedback.push("⚠️ Réponse beaucoup trop courte pour être convaincante."); }
@@ -278,11 +300,18 @@ export class TechToBoardEngine {
       // Logique CTI (Keywords, Length)
       const keywords = caseStudy.keywordsToInclude || [];
       let matched = 0;
-      keywords.forEach(kw => { if (lower.includes(kw.toLowerCase())) matched++ });
+      keywords.forEach(kw => { if (containsTerm(lower, kw, { prefix: true })) matched++ });
       
       const lengthScore = Math.min(30, Math.round(lower.length / 10));
       const keywordScore = keywords.length > 0 ? Math.round((matched / keywords.length) * 70) : 70;
       score = Math.min(100, lengthScore + keywordScore);
+
+      // Une simple liste de mots-clés n'est pas une synthèse : plafond si le texte n'est pas rédigé
+      const wordCount = lower.split(/\s+/).filter(Boolean).length;
+      if (wordCount < 40) {
+        score = Math.min(score, 55);
+        feedback.push("⚠️ Réponse trop courte pour une note au Board : rédigez faits, impact, niveau de confiance et recommandation.");
+      }
       
       feedback.push(`Vous avez inclus ${matched} mots-clés stratégiques sur ${keywords.length}.`);
       if (matched === keywords.length) {
@@ -336,11 +365,20 @@ Tu dois répondre UNIQUEMENT par un objet JSON valide (sans markdown) avec cette
   }
 }`;
 
+    // Les cas CTI fournissent context/technicalFact/boardQuestion ; les cas Cyber rawReport et
+    // stakeholders : sans ce repli, le modèle notait sur un contexte « undefined »
+    const st = caseStudy?.stakeholders?.[targetStakeholderId] || caseStudy?.stakeholders?.dg
+    const context = caseStudy.context || caseStudy.title || ''
+    const technicalFact = caseStudy.technicalFact || caseStudy.rawReport || ''
+    const boardQuestion = caseStudy.boardQuestion || (st ? `${st.name} (${st.title}) s'inquiète : ${st.concern}` : '')
+    const reference = caseStudy.idealAnswer || st?.suggestedPitch || caseStudy.suggestedPitch || 'Une réponse claire, orientée risque et métier, sans jargon.'
+    const expectedAngle = st?.keyAngle ? `\nAngle attendu pour ce décideur : ${st.keyAngle}` : ''
+
     const userPrompt = `
-Contexte du cas : ${caseStudy.context}
-Fait technique : ${caseStudy.technicalFact}
-Question posée par le Comex : ${caseStudy.boardQuestion}
-Réponse idéale de référence : ${caseStudy.idealAnswer || 'Une réponse claire, orientée risque et métier, sans jargon.'}
+Contexte du cas : ${context}
+Fait technique : ${technicalFact}
+Question posée par le décideur : ${boardQuestion}${expectedAngle}
+Réponse idéale de référence : ${reference}
 
 ---
 Réponse fournie par l'apprenant :
