@@ -62,7 +62,7 @@
                 {{ currentRoleLabel }}
               </th>
             </template>
-            <th class="py-3 px-4">{{ rationaleLabel || 'Justification & Enjeux' }}</th>
+            <th v-if="hasRationale" class="py-3 px-4">{{ rationaleLabel || 'Justification & Enjeux' }}</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-800/60 font-sans">
@@ -101,12 +101,12 @@
               </td>
             </template>
 
-            <td class="py-2.5 px-4 text-slate-400 whitespace-normal leading-relaxed min-w-[16rem]">
+            <td v-if="hasRationale" class="py-2.5 px-4 text-slate-400 whitespace-normal leading-relaxed min-w-[16rem]">
               {{ row.rationale }}
             </td>
           </tr>
           <tr v-if="filteredData.length === 0">
-            <td :colspan="selectedRole === 'ALL' ? roles.length + 2 : 3" class="py-6 text-center text-slate-400 text-xs">
+            <td :colspan="(selectedRole === 'ALL' ? roles.length + 1 : 2) + (hasRationale ? 1 : 0)" class="py-6 text-center text-slate-400 text-xs">
               {{ t('cyber_raci_empty') }}
             </td>
           </tr>
@@ -162,6 +162,9 @@ const currentRoleLabel = computed(() => {
   const r = props.roles.find(x => x.key === selectedRole.value)
   return r ? r.label : ''
 })
+
+// La colonne de justification n'apparaît que si au moins une ligne en fournit une
+const hasRationale = computed(() => props.data.some(row => row.rationale))
 
 const filteredData = computed(() => {
   return props.data
