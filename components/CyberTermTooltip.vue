@@ -60,6 +60,33 @@ async function loadGlossary() {
   return []
 }
 
+// Alias d'une entrée : « RSSI / CISO » → rssi, ciso (« RGPD art. 28 » est trouvé par préfixe) ;
+// identifiant cert_fr → cert-fr. Le terme principal (avant « ( ») reste comparé en préfixe.
+function aliasesOf(t) {
+  const out = new Set()
+  for (const raw of [t.id, t.acronym, t.term, t.fullName]) {
+    if (!raw) continue
+    const base = String(raw).split(' (')[0].toLowerCase().trim().replace(/_/g, '-')
+    out.add(base)
+    for (const part of base.split('/')) {
+      const p = part.trim()
+      if (p) out.add(p)
+    }
+  }
+  return [...out]
+}
+
+function findTerm(db, word) {
+  const q = word.toLowerCase()
+  // Pluriel anglais/français des sigles : IoCs → IoC, TTPs → TTP, FQDNs → FQDN
+  const candidates = q.length > 3 && q.endsWith('s') ? [q, q.slice(0, -1)] : [q]
+  for (const c of candidates) {
+    const hit = db.find(t => aliasesOf(t).some(a => a === c || a.startsWith(c + ' ') || a.startsWith(c + '-')))
+    if (hit) return hit
+  }
+  return null
+}
+
 function getWordUnderCursor(x, y) {
   let range, textNode, offset;
   
@@ -131,22 +158,7 @@ function handleMouseMove(e) {
           const db = await loadGlossary()
           const q = word.toLowerCase()
           
-          const found = db.find(t => {
-            if (t.id && t.id.toLowerCase() === q) return true;
-            if (t.acronym && t.acronym.toLowerCase() === q) return true;
-            
-            if (t.term) {
-              const termBase = t.term.split(' (')[0].toLowerCase().trim()
-              if (termBase === q) return true;
-              if (termBase.startsWith(q + " ") || termBase.startsWith(q + "-")) return true;
-            }
-            if (t.fullName) {
-               const fnBase = t.fullName.split(' (')[0].toLowerCase().trim()
-               if (fnBase === q) return true;
-               if (fnBase.startsWith(q + " ") || fnBase.startsWith(q + "-")) return true;
-            }
-            return false;
-          })
+          const found = findTerm(db, word)
 
           if (found) {
             termData.value = found
