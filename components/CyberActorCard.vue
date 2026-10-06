@@ -67,7 +67,19 @@ function gaugeClass(gauge, value) {
 const showDetails = ref(false)
 
 const currentPreset = computed(() => {
-  return props.actor.presets[props.actor.activePreset]
+  return props.actor.presets?.[props.actor.activePreset] || {}
+})
+
+const badgeLabel = computed(() => {
+  return currentPreset.value?.bias || currentPreset.value?.levelLabel || ''
+})
+
+const badgeClass = computed(() => {
+  if (currentPreset.value?.badgeClass) return currentPreset.value.badgeClass
+  const p = props.actor.activePreset
+  if (p === 'cooperative') return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+  if (p === 'demanding') return 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+  return 'bg-rose-500/15 text-rose-300 border-rose-500/30'
 })
 
 const moodColor = computed(() => {
@@ -100,6 +112,7 @@ const moodColor = computed(() => {
         </div>
 
         <CyberVoiceButton
+          v-if="currentPreset.sampleQuote"
           :speech-id="`actor-quote-${actor.id}`"
           :text="currentPreset.sampleQuote"
           :voice="actor.id"
@@ -123,12 +136,11 @@ const moodColor = computed(() => {
             type="button"
             :aria-pressed="actor.activePreset === preset.id"
             :class="actor.activePreset === preset.id ? preset.activeClass : 'text-slate-400 hover:text-slate-200 border-transparent hover:bg-slate-800/60'"
-            class="flex flex-col items-center justify-center gap-1 py-2 px-1 rounded-md border text-sm leading-tight text-center transition-all min-w-0"
-            :title="t(preset.labelKey)"
+            class="flex flex-col items-center justify-center gap-1 py-1.5 px-0.5 sm:px-1 rounded-md border text-xs leading-tight text-center transition-all min-w-0"
             @click="$emit('changePreset', { actorId: actor.id, preset: preset.id })"
           >
-            <component :is="preset.icon" class="w-4 h-4 shrink-0" :class="preset.iconClass" aria-hidden="true" />
-            <span class="break-words hyphens-auto w-full">{{ t(preset.labelKey) }}</span>
+            <component :is="preset.icon" class="w-3.5 h-3.5 shrink-0" :class="preset.iconClass" aria-hidden="true" />
+            <span class="truncate whitespace-nowrap w-full text-center tracking-tight text-[11px] sm:text-xs font-medium">{{ t(preset.labelKey) }}</span>
           </button>
         </div>
       </div>
@@ -150,19 +162,20 @@ const moodColor = computed(() => {
 
         <!-- Bias Badge : Spacious, legible, non-cramped -->
         <div 
+          v-if="badgeLabel"
           class="px-2.5 py-1.5 rounded-md border text-xs font-medium leading-snug flex items-center justify-center text-center"
-          :class="currentPreset.badgeClass"
+          :class="badgeClass"
         >
-          {{ currentPreset.bias }}
+          {{ badgeLabel }}
         </div>
 
         <!-- Description & Sample Quote (repliables) -->
         <div v-show="showDetails" class="space-y-2.5 animate-fade-in">
-          <p class="text-sm text-slate-300 leading-relaxed">
+          <p v-if="currentPreset.description" class="text-sm text-slate-300 leading-relaxed">
             {{ currentPreset.description }}
           </p>
 
-          <div class="text-sm italic text-slate-200 border-l-2 border-cyan-500/60 pl-3 bg-cyan-950/25 py-1.5 rounded-r leading-relaxed flex items-center justify-between gap-2">
+          <div v-if="currentPreset.sampleQuote" class="text-sm italic text-slate-200 border-l-2 border-cyan-500/60 pl-3 bg-cyan-950/25 py-1.5 rounded-r leading-relaxed flex items-center justify-between gap-2">
             <span>{{ currentPreset.sampleQuote }}</span>
             <CyberVoiceButton
               :speech-id="`actor-quote-${actor.id}`"

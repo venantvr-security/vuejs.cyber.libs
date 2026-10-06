@@ -122,10 +122,10 @@
               @mouseleave="hoveredRole = ''"
             >
               <span
-                v-if="row[role.key] && filters[row[role.key]]"
+                v-if="getRoleValue(row, role.key) && filters[getRoleValue(row, role.key)]"
                 class="inline-flex items-center justify-center w-8 h-8 min-w-[2rem] max-w-[2rem] min-h-[2rem] max-h-[2rem] shrink-0 rounded-lg border font-mono text-sm font-bold tracking-tight select-none shadow-sm transition-all duration-150 hover:scale-110"
-                :class="getBadgeClass(row[role.key])"
-              >{{ row[role.key] }}</span>
+                :class="getBadgeClass(getRoleValue(row, role.key))"
+              >{{ getRoleValue(row, role.key) }}</span>
               <span v-else class="inline-flex items-center justify-center w-8 h-8 min-w-[2rem] min-h-[2rem] text-slate-600 font-mono text-xs select-none" aria-hidden="true">·</span>
             </td>
             <td v-if="hasRationale" class="py-3.5 px-4 text-slate-300 text-xs sm:text-sm whitespace-normal leading-relaxed border-l border-slate-800/40">
@@ -219,8 +219,26 @@ const currentRoleLabel = computed(() => {
 // La colonne de justification n'apparaît que si au moins une ligne en fournit une
 const hasRationale = computed(() => props.data.some(row => row.rationale))
 
+function getRoleValue(row, roleKey) {
+  if (!row) return ''
+  return row[roleKey] || (row.roles && row.roles[roleKey]) || ''
+}
+
 const filteredData = computed(() => {
-  return props.data
+  if (!props.data) return []
+  return props.data.filter(row => {
+    if (selectedRole.value === 'ALL') {
+      // Row is visible if any role has a letter that is currently selected in filters
+      return props.roles.some(r => {
+        const letter = getRoleValue(row, r.key)
+        return letter && filters.value[letter]
+      })
+    } else {
+      // When a specific role is selected, filter by that role's letter
+      const letter = getRoleValue(row, selectedRole.value)
+      return letter && filters.value[letter]
+    }
+  })
 })
 
 function getBadgeClass(letter) {
