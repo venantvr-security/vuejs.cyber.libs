@@ -30,7 +30,7 @@ const history = [
 
 describe('WarRoomEngine', () => {
   test('buildAlternatingContents (même signature) : pas de doublon, consigne envoyée, ouverture gardée', () => {
-    const engine = new WarRoomEngine({})
+    const engine = new WarRoomEngine({ discoverModels: false, })
     const contents = engine.buildAlternatingContents(history, 'Rssi, quel délai pour le retest ?')
     assert.equal(contents[0].parts[0].text, '[Ouverture de séance]')
     const last = contents[contents.length - 1]
@@ -40,7 +40,7 @@ describe('WarRoomEngine', () => {
   })
 
   test('validateTurn sans acteurs : comportement historique (format cyber, ±20)', () => {
-    const engine = new WarRoomEngine({})
+    const engine = new WarRoomEngine({ discoverModels: false, })
     const turn = engine.validateTurn({ dialogues: [{ text: 'x' }], metricsImpact: { trust: 99 }, _engineFallback: true })
     assert.equal(turn.dialogues.length, 1)
     assert.equal(turn.metricsImpact.trust, 20)
@@ -57,9 +57,9 @@ describe('WarRoomEngine', () => {
       metricsDelta: { availability: '+5' }
     }))
     const policy = createQuestionPolicy({ rate: 0, rng: seq(0.99) })
-    const engine = new WarRoomEngine({ apiKey: 'k', turnSchema: DEPLOY_TURN_SCHEMA, useResponseSchema: true, thinkingBudget: 0, questionPolicy: policy })
+    const engine = new WarRoomEngine({ discoverModels: false,  apiKey: 'k', turnSchema: DEPLOY_TURN_SCHEMA, useResponseSchema: true, thinkingBudget: 0, questionPolicy: policy })
     const turn = await engine.playTurn({ actors: ACTORS, scenario: { title: 'T' }, metrics: {}, userMessage: 'Rssi, quel délai pour le retest ?', history, targetActorId: 'rssi' })
-    assert.equal(turn._engineUsedModel, 'gemini-2.5-flash')
+    assert.equal(turn._engineUsedModel, 'gemini-3.8-flash')
     assert.deepEqual(turn.dialogues.map((d) => d.actorId), ['rssi', 'dg'])
     assert.equal(turn.metricsImpact.availability, 5)
     const body = calls[0].body
@@ -78,13 +78,13 @@ describe('WarRoomEngine', () => {
 
   test('400 non lié à la clé : modèle suivant ; 400 API_KEY_INVALID : arrêt et repli local', async () => {
     responder = (url, init, n) => (n === 1 ? jsonResponse(400, { error: { message: 'JSON mode is not enabled' } }) : geminiText('{"dialogues":[{"actorId":"dg","text":"OK."}]}'))
-    const engine = new WarRoomEngine({ apiKey: 'k' })
+    const engine = new WarRoomEngine({ discoverModels: false,  apiKey: 'k', candidateModels: ['gemini-3.8-flash', 'gemini-3.8-flash-lite'] })
     const turn = await engine.playTurn({ actors: ACTORS, userMessage: 'x', history: [] })
-    assert.equal(turn._engineUsedModel, 'gemini-2.5-flash-lite')
+    assert.equal(turn._engineUsedModel, 'gemini-3.8-flash-lite')
 
     responder = () => jsonResponse(400, { error: { message: 'API key not valid', details: [{ reason: 'API_KEY_INVALID' }] } })
     calls = []
-    const local = new WarRoomEngine({ apiKey: 'bad', localSimulator: (a) => ({ dialogues: [{ actorId: 'dg', text: `Local ${a.currentMetrics.security}.` }], metricsImpact: {} }) })
+    const local = new WarRoomEngine({ discoverModels: false,  apiKey: 'bad', localSimulator: (a) => ({ dialogues: [{ actorId: 'dg', text: `Local ${a.currentMetrics.security}.` }], metricsImpact: {} }) })
     const fallback = await local.playTurn({ actors: ACTORS, metrics: { security: 70 }, userMessage: 'x', history: [] })
     assert.equal(calls.length, 1)
     assert.equal(fallback._engineFallback, true)
@@ -94,7 +94,7 @@ describe('WarRoomEngine', () => {
 
   test('MAX_TOKENS : _truncated et dernière réplique coupée retirée', async () => {
     responder = () => geminiText('{"dialogues":[{"actorId":"dg","text":"Complet."},{"actorId":"rssi","text":"Je pense que nous dev', 'MAX_TOKENS')
-    const engine = new WarRoomEngine({ apiKey: 'k' })
+    const engine = new WarRoomEngine({ discoverModels: false,  apiKey: 'k' })
     const turn = await engine.playTurn({ actors: ACTORS, userMessage: 'x', history: [] })
     assert.equal(turn._truncated, true)
     assert.deepEqual(turn.dialogues.map((d) => d.actorId), ['dg'])
@@ -102,7 +102,7 @@ describe('WarRoomEngine', () => {
 
   test('prompt qui lève une exception : repli local (construction dans le try) ; simulateur absent toléré', async () => {
     responder = () => { throw new Error('ne doit pas être appelé') }
-    const engine = new WarRoomEngine({ apiKey: 'k', systemPromptGenerator: () => { throw new Error('boom') } })
+    const engine = new WarRoomEngine({ discoverModels: false,  apiKey: 'k', systemPromptGenerator: () => { throw new Error('boom') } })
     const turn = await engine.playTurn({ actors: ACTORS, userMessage: 'x', history: [] })
     assert.equal(turn._engineFallback, true)
     assert.equal(turn.dialogues.length, 0)
@@ -112,7 +112,7 @@ describe('WarRoomEngine', () => {
 
   test('sans clé : simulateur local avec contrat élargi (currentMetrics, transcript, plan, targetActorId)', async () => {
     let received = null
-    const engine = new WarRoomEngine({ localSimulator: (args) => { received = args; return { interventions: [{ actorId: 'rssi', text: 'Local.' }], metricsDelta: { availability: 3 } } }, turnSchema: DEPLOY_TURN_SCHEMA, questionPolicy: createQuestionPolicy({ rng: seq(0.99) }) })
+    const engine = new WarRoomEngine({ discoverModels: false,  localSimulator: (args) => { received = args; return { interventions: [{ actorId: 'rssi', text: 'Local.' }], metricsDelta: { availability: 3 } } }, turnSchema: DEPLOY_TURN_SCHEMA, questionPolicy: createQuestionPolicy({ rng: seq(0.99) }) })
     const turn = await engine.playTurn({ actors: ACTORS, metrics: { security: 1 }, userMessage: 'Bonjour', history, targetActorId: 'rssi' })
     assert.deepEqual(received.currentMetrics, { security: 1 })
     assert.equal(received.targetActorId, 'rssi')
@@ -125,7 +125,7 @@ describe('WarRoomEngine', () => {
   test('annulation : AbortError, pas de repli', async () => {
     const controller = new AbortController()
     controller.abort()
-    const engine = new WarRoomEngine({ apiKey: 'k', localSimulator: () => ({ dialogues: [{ text: 'x' }] }) })
+    const engine = new WarRoomEngine({ discoverModels: false,  apiKey: 'k', localSimulator: () => ({ dialogues: [{ text: 'x' }] }) })
     await assert.rejects(engine.playTurn({ actors: ACTORS, userMessage: 'x', history: [], signal: controller.signal }), { name: 'AbortError' })
   })
 

@@ -498,14 +498,14 @@ const turn = await engine.playTurn({ actors, scenario, metrics, userMessage, his
 
 ### 1. `WarRoomEngine`
 
-Moteur de simulation de tour de table en cellule de crise. Il sollicite l'API Gemini avec clé passée en en-tête `x-goog-api-key` (délai de 20s, bascule multi-modèles `gemini-2.5-flash` → `gemini-2.5-flash-lite` → `gemini-2.0-flash`) et valide strictement les répliques et deltas d'impact. En cas d'échec ou d'absence de clé, il bascule sur le simulateur local sans interruption de service.
+Moteur de simulation de tour de table en cellule de crise. Il sollicite l'API Gemini avec clé passée en en-tête `x-goog-api-key` (délai de 20s ; modèles découverts via l'API avec `resolveGeminiModelChain` : `gemini-3.8-flash` par défaut, puis les mieux classés parmi ceux que l'API liste, jamais un modèle retiré ; option `discoverModels: false` pour une liste statique) et valide strictement les répliques et deltas d'impact. En cas d'échec ou d'absence de clé, il bascule sur le simulateur local sans interruption de service.
 
 ```javascript
 import { WarRoomEngine } from 'vuejs.libs.nexus'
 
 const engine = new WarRoomEngine({
   apiKey: userApiKey,
-  model: 'gemini-2.5-flash',
+  model: 'gemini-3.8-flash',
   systemPromptGenerator: (actors, scenario, metrics) => '...',
   localSimulator: (args) => ({ dialogues: [...], metricsImpact: {...} }),
 })
@@ -613,3 +613,16 @@ Pour préserver la sanctuarisation de la propriété intellectuelle lors des éc
 
 Projet interne — **Nexus Security Suite** (CYBER-NEXUS, CTI-NEXUS, DEPLOY-NEXUS).
 Dépôt : [https://github.com/venantvr-security/vuejs.libs.nexus.git](https://github.com/venantvr-security/vuejs.libs.nexus.git)
+
+---
+
+## Modèles Gemini (découverte via l'API)
+
+- `DEFAULT_GEMINI_MODEL` = `gemini-3.8-flash` ; `FALLBACK_GEMINI_MODELS` = `[DEFAULT_GEMINI_MODEL]` (utilisée seulement si l'API ne répond pas).
+- `listGeminiModels(apiKey)` : modèles `generateContent` de la clé ; `getAvailableGeminiModels(apiKey, { force })` : même liste avec cache mémoire de 10 min par clé.
+- `rankGeminiModels(models, preferred)` : préféré, stables avant preview/exp, flash puis flash-lite puis pro, version décroissante ; familles retirées écartées (`isRetiredGeminiModel` : gemini-1.x, gemini-2.0).
+- `pickDefaultGeminiModel(models)` : `gemini-3.8-flash` s'il est listé, sinon le mieux classé.
+- `resolveGeminiModelChain(apiKey, preferred, candidates, { max: 3 })` : modèles à essayer, uniquement parmi ceux que l'API liste. Utilisé par `WarRoomEngine` et `TechToBoardEngine` (option `discoverModels`, défaut `true`).
+- `createGeminiSettingsStore(prefix).reconcileModel(models)` : remplace le modèle enregistré s'il n'est plus listé ; `getModel()` remplace d'office un modèle retiré.
+- `testGeminiApiKey(key, model)` : si le modèle demandé n'est pas listé, teste `pickDefaultGeminiModel(models)`.
+

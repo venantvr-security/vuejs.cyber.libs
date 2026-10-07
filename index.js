@@ -18,7 +18,10 @@ import {
   candidateText,
   parseGeminiJson,
   parseGeminiJsonDetailed,
-  listGeminiModels
+  listGeminiModels,
+  pickDefaultGeminiModel,
+  rankGeminiModels,
+  resolveGeminiModelChain
 } from './services/gemini.js'
 import { containsTerm, matchTermGroups, describeStakeholderForPrompt, assessAgainstStakeholder, normalize } from './services/stakeholderProfile.js'
 import {
@@ -45,7 +48,15 @@ export {
   isFatalGeminiError,
   supportsThinking,
   createGeminiSettingsStore,
-  DEFAULT_MODEL_EXCLUDES
+  DEFAULT_MODEL_EXCLUDES,
+  RETIRED_GEMINI_MODEL_PATTERN,
+  isRetiredGeminiModel,
+  geminiModelVersion,
+  rankGeminiModels,
+  pickDefaultGeminiModel,
+  getAvailableGeminiModels,
+  clearGeminiModelsCache,
+  resolveGeminiModelChain
 } from './services/gemini.js'
 
 export {
@@ -268,6 +279,8 @@ export class WarRoomEngine {
     this.promptOptions = isPlainObject(options.promptOptions) ? options.promptOptions : {}
     this.localSimulator = options.localSimulator
     this.candidateModels = options.candidateModels || FALLBACK_GEMINI_MODELS
+    // Modèles découverts via l'API (cache 10 min par clé) : un modèle retiré n'est jamais appelé
+    this.discoverModels = options.discoverModels !== false
     this.maxTokens = options.maxTokens || 3072
     this.retryMaxTokens = Number.isFinite(options.retryMaxTokens) ? options.retryMaxTokens : Math.max(8192, this.maxTokens)
     this.retrySameModel = options.retrySameModel !== false
@@ -525,7 +538,10 @@ export class WarRoomEngine {
     let partialModel = null
     let calls = 0
     let truncatedCalls = 0
-    models: for (const mName of modelsToTry(this.model, this.candidateModels)) {
+    const chain = this.discoverModels
+      ? await resolveGeminiModelChain(apiKey, this.model, this.candidateModels, { timeoutMs: this.timeoutMs, signal })
+      : modelsToTry(this.model, this.candidateModels)
+    models: for (const mName of chain) {
       if (signal?.aborted) throw abortError()
       const partialBefore = this.partialTurn
       // Un seul nouvel essai par modèle (réponse tronquée ou invalide)
@@ -618,20 +634,8 @@ const asList = (v) => (Array.isArray(v) ? v : [])
 
 /** Modèles Gemini disponibles ([] en cas d'erreur, comportement historique). Voir listGeminiModels pour les options. */
 export async function fetchAvailableGeminiModels(apiKey) {
-  const key = cleanApiKey(apiKey)
-  if (!key) return []
-  try {
-    const response = await geminiFetch('models', key)
-    if (response.ok) {
-      const data = await response.json()
-      return (Array.isArray(data?.models) ? data.models : [])
-        .filter(m => typeof m?.name === 'string' && Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent') && m.name.includes('gemini'))
-        .map(m => ({ id: m.name.replace('models/', ''), name: m.displayName || m.name }))
-    }
-  } catch (err) {
-    console.warn("Impossible de lister les modèles :", err)
-  }
-  return []
+  const models = await listGeminiModels(apiKey)
+  return rankGeminiModels(models).map((m) => ({ id: m.id, name: m.name }))
 }
 
 /**
@@ -658,7 +662,7 @@ export async function testGeminiApiKey(apiKey, requestedModel = null) {
 
   const cleanRequested = cleanModelName(requestedModel)
   const requestedObj = cleanRequested ? models.find(m => m.id === cleanRequested) : null
-  const validModel = (requestedObj || models[0]).id
+  const validModel = requestedObj ? requestedObj.id : pickDefaultGeminiModel(models)
 
   const response = await geminiFetch(`models/${validModel}:generateContent`, key, {
     body: { contents: [{ role: 'user', parts: [{ text: 'OK' }] }] }
@@ -816,12 +820,14 @@ export class TechToBoardEngine {
    * @param {string} [options.apiKey] Clé API Gemini (sans clé : évaluation locale)
    * @param {string} [options.model] Modèle préféré
    * @param {string[]} [options.candidateModels] Modèles de repli, défaut FALLBACK_GEMINI_MODELS
+   * @param {boolean} [options.discoverModels] Liste les modèles via l'API et n'appelle que ceux qui existent (défaut true)
    * @param {number} [options.timeoutMs] Délai maximal d'un appel, défaut 20000 ms
    */
   constructor(options = {}) {
     this.apiKey = options.apiKey || null
     this.model = options.model || DEFAULT_GEMINI_MODEL
     this.candidateModels = options.candidateModels || FALLBACK_GEMINI_MODELS
+    this.discoverModels = options.discoverModels !== false
     this.timeoutMs = options.timeoutMs ?? GEMINI_REQUEST_TIMEOUT_MS
   }
 
@@ -1073,7 +1079,10 @@ ${neutralizeLearnerText(text)}
     }
 
     let lastError = null
-    for (const mName of modelsToTry(this.model, this.candidateModels)) {
+    const chain = this.discoverModels
+      ? await resolveGeminiModelChain(apiKey, this.model, this.candidateModels, { timeoutMs: this.timeoutMs })
+      : modelsToTry(this.model, this.candidateModels)
+    for (const mName of chain) {
       try {
         const response = await geminiFetch(`models/${mName}:generateContent`, apiKey, { body: payload, timeoutMs: this.timeoutMs })
         if (!response.ok) {

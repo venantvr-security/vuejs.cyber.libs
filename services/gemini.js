@@ -3,9 +3,12 @@
 
 import { jsonrepair } from 'jsonrepair'
 
-// La famille gemini-1.5 est retirée : chaque appel échouait et basculait sur le moteur local
-export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
-export const FALLBACK_GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash']
+// Modèle par défaut. Les modèles réellement utilisables sont découverts via l'API (listGeminiModels) :
+// la liste statique ne sert que si l'API ne répond pas.
+export const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash'
+export const FALLBACK_GEMINI_MODELS = [DEFAULT_GEMINI_MODEL]
+// Familles retirées par Google : toute préférence enregistrée sur l'une d'elles est remplacée
+export const RETIRED_GEMINI_MODEL_PATTERN = /^gemini-(1\.|2\.0)/
 
 export const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta'
 export const GEMINI_REQUEST_TIMEOUT_MS = 20000
@@ -305,7 +308,8 @@ function storage() {
  * Réglages Gemini persistés (localStorage, avec garde) pour une application.
  * Clés : `${prefix}_gemini_api_key`, `${prefix}_gemini_model`, `${prefix}_gemini_models_cache`
  * (prefix 'cyber_nexus', 'cti_nexus', 'deploy_nexus' : clés actuelles des apps conservées).
- * getModel migre les anciennes préférences gemini-1.x vers DEFAULT_GEMINI_MODEL.
+ * getModel remplace une préférence retirée (gemini-1.x, gemini-2.0) par defaultModel ;
+ * reconcileModel(models) la remplace aussi si l'API ne la liste plus.
  */
 export function createGeminiSettingsStore(prefix, { defaultModel = DEFAULT_GEMINI_MODEL } = {}) {
   const p = typeof prefix === 'string' && prefix.trim() ? prefix.trim() : 'nexus'
@@ -315,6 +319,14 @@ export function createGeminiSettingsStore(prefix, { defaultModel = DEFAULT_GEMIN
   const get = (k) => { try { return storage()?.getItem(k) || '' } catch (e) { return '' } }
   const set = (k, v) => { try { storage()?.setItem(k, v) } catch (e) { /* quota, accès refusé */ } }
   const del = (k) => { try { storage()?.removeItem(k) } catch (e) { /* accès refusé */ } }
+  function readModel() {
+    const stored = cleanModelName(get(MODEL))
+    if (!stored || isRetiredGeminiModel(stored)) {
+      if (stored) set(MODEL, defaultModel)
+      return defaultModel
+    }
+    return stored
+  }
   return {
     keys: { apiKey: KEY, model: MODEL, modelsCache: CACHE },
     getApiKey: () => get(KEY).trim(),
@@ -323,14 +335,7 @@ export function createGeminiSettingsStore(prefix, { defaultModel = DEFAULT_GEMIN
       if (clean) set(KEY, clean)
       else del(KEY)
     },
-    getModel() {
-      const stored = cleanModelName(get(MODEL))
-      if (!stored || /gemini-1\./.test(stored)) {
-        if (stored) set(MODEL, defaultModel)
-        return defaultModel
-      }
-      return stored
-    },
+    getModel: readModel,
     saveModel(model) {
       const clean = cleanModelName(model)
       if (clean) set(MODEL, clean)
@@ -346,6 +351,110 @@ export function createGeminiSettingsStore(prefix, { defaultModel = DEFAULT_GEMIN
       if (Array.isArray(models)) set(CACHE, JSON.stringify(models))
       else del(CACHE)
     },
+    /**
+     * Aligne le modèle enregistré sur la liste de l'API : s'il n'y figure plus, il est remplacé par
+     * pickDefaultGeminiModel(models, defaultModel). Renvoie le modèle retenu. Liste vide : rien ne change.
+     */
+    reconcileModel(models) {
+      const list = Array.isArray(models) ? models : []
+      const current = readModel()
+      if (!list.length) return current
+      if (list.some((m) => modelId(m) === current)) return current
+      const picked = pickDefaultGeminiModel(list, defaultModel)
+      set(MODEL, picked)
+      return picked
+    },
     clear() { del(KEY); del(MODEL); del(CACHE) }
   }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Choix du modèle à partir de la liste renvoyée par l'API
+// ---------------------------------------------------------------------------------------------
+
+const modelId = (m) => cleanModelName(typeof m === 'string' ? m : m?.id || m?.name)
+
+export function isRetiredGeminiModel(model) {
+  return RETIRED_GEMINI_MODEL_PATTERN.test(cleanModelName(model))
+}
+
+/** Version numérique d'un identifiant (« gemini-3.8-flash » → 3.8), 0 si absente. */
+export function geminiModelVersion(model) {
+  const m = /gemini-(\d+(?:\.\d+)?)/.exec(cleanModelName(model))
+  return m ? Number(m[1]) : 0
+}
+
+// Rang de famille : flash d'abord (rapide, adapté au dialogue), puis flash-lite, pro, le reste
+function modelTier(id) {
+  if (/flash-lite/.test(id)) return 1
+  if (/flash/.test(id)) return 0
+  if (/pro/.test(id)) return 2
+  return 3
+}
+
+const isUnstableModel = (id) => /preview|exp/.test(id)
+
+/**
+ * Trie les modèles du plus adapté au moins adapté : modèle préféré, puis modèles stables avant
+ * preview/expérimental, famille (flash, flash-lite, pro, autres), version décroissante.
+ * Les familles retirées sont écartées. Accepte des chaînes ou des objets { id }.
+ */
+export function rankGeminiModels(models, preferred = DEFAULT_GEMINI_MODEL) {
+  const pref = cleanModelName(preferred)
+  return (Array.isArray(models) ? models : [])
+    .filter((m) => modelId(m) && !isRetiredGeminiModel(modelId(m)))
+    .slice()
+    .sort((a, b) => {
+      const ia = modelId(a)
+      const ib = modelId(b)
+      return (ib === pref) - (ia === pref)
+        || isUnstableModel(ia) - isUnstableModel(ib)
+        || modelTier(ia) - modelTier(ib)
+        || geminiModelVersion(ib) - geminiModelVersion(ia)
+        || ia.localeCompare(ib)
+    })
+}
+
+/** Modèle par défaut parmi ceux de l'API : le préféré s'il est listé, sinon le mieux classé. */
+export function pickDefaultGeminiModel(models, preferred = DEFAULT_GEMINI_MODEL) {
+  const ranked = rankGeminiModels(models, preferred)
+  return ranked.length ? modelId(ranked[0]) : cleanModelName(preferred) || DEFAULT_GEMINI_MODEL
+}
+
+// Liste des modèles mise en cache par clé API (les échecs ne sont pas mis en cache)
+const MODELS_CACHE_TTL_MS = 10 * 60 * 1000
+const modelsCache = new Map()
+
+/** listGeminiModels avec cache mémoire par clé (10 min). force: true ignore le cache. [] en cas d'erreur. */
+export async function getAvailableGeminiModels(apiKey, { force = false, timeoutMs, signal } = {}) {
+  const key = cleanApiKey(apiKey)
+  if (!key) return []
+  const hit = modelsCache.get(key)
+  if (!force && hit && Date.now() - hit.at < MODELS_CACHE_TTL_MS) return hit.models
+  const models = await listGeminiModels(key, { timeoutMs, signal })
+  if (models.length) modelsCache.set(key, { at: Date.now(), models })
+  return models
+}
+
+export function clearGeminiModelsCache() {
+  modelsCache.clear()
+}
+
+/**
+ * Modèles à essayer pour un appel : le préféré et les candidats explicites s'ils existent encore pour
+ * cette clé, complétés par les mieux classés de l'API (max au total). Si l'API ne répond pas, retombe
+ * sur modelsToTry(preferred, candidates) sans les familles retirées.
+ */
+export async function resolveGeminiModelChain(apiKey, preferred, candidates, { max = 3, timeoutMs, signal } = {}) {
+  const models = await getAvailableGeminiModels(apiKey, { timeoutMs, signal })
+  if (!models.length) {
+    const chain = modelsToTry(preferred, candidates).filter((m) => !isRetiredGeminiModel(m))
+    return chain.length ? chain : [DEFAULT_GEMINI_MODEL]
+  }
+  const available = new Set(models.map(modelId))
+  const ranked = rankGeminiModels(models, DEFAULT_GEMINI_MODEL).map(modelId)
+  const wanted = [preferred, ...(Array.isArray(candidates) ? candidates : []), ...ranked]
+    .map(cleanModelName)
+    .filter((id) => id && available.has(id) && !isRetiredGeminiModel(id))
+  return Array.from(new Set(wanted)).slice(0, Math.max(1, max))
 }

@@ -146,7 +146,7 @@ describe('WarRoomEngine : porte des lignes rouges, dégressivité, appels limit�
 
   test('Gemini récompense une ligne rouge au conditionnel : gains remis à zéro', async () => {
     responder = () => reply(okTurn({ security: 2, compliance: 2, trust: -1 }))
-    const engine = new WarRoomEngine({ apiKey: 'k' })
+    const engine = new WarRoomEngine({ discoverModels: false,  apiKey: 'k' })
     const turn = await engine.playTurn({ actors: ACTORS, userMessage: 'On pourrait suspendre la Security Gate pendant deux sprints, sans le noter dans le registre.', history: [] })
     assert.deepEqual(turn.metricsImpact, { security: 0, compliance: 0, trust: -1, teamClimate: 0 })
     assert.equal(turn._redLineGate.crossed, true)
@@ -154,7 +154,7 @@ describe('WarRoomEngine : porte des lignes rouges, dégressivité, appels limit�
 
   test('dégressivité : le même engagement répété ne rapporte plus', async () => {
     responder = () => reply(okTurn({ security: 6, compliance: 6 }))
-    const engine = new WarRoomEngine({ apiKey: 'k', creditLedger: createCreditLedger() })
+    const engine = new WarRoomEngine({ discoverModels: false,  apiKey: 'k', creditLedger: createCreditLedger() })
     const msg = 'Le prestataire PASSI testera les passerelles avant la mise en production.'
     const first = await engine.playTurn({ actors: ACTORS, userMessage: msg, history: [] })
     assert.equal(first.metricsImpact.security, 6)
@@ -165,7 +165,7 @@ describe('WarRoomEngine : porte des lignes rouges, dégressivité, appels limit�
 
   test('JSON tronqué : un seul nouvel essai, pas de multiplication des appels', async () => {
     responder = () => reply('{"dialogues":[{"actorId":"dg","text":"Complet."},{"actorId":"rssi","text":"Je pense que nous dev', 'MAX_TOKENS')
-    const engine = new WarRoomEngine({ apiKey: 'k' })
+    const engine = new WarRoomEngine({ discoverModels: false,  apiKey: 'k' })
     const turn = await engine.playTurn({ actors: ACTORS, userMessage: 'x', history: [] })
     assert.equal(calls, 2)
     assert.equal(turn._truncated, true)
@@ -173,7 +173,7 @@ describe('WarRoomEngine : porte des lignes rouges, dégressivité, appels limit�
 
   test('JSON invalide partout : au plus maxCallsPerTurn appels', async () => {
     responder = () => reply('pas de json')
-    const engine = new WarRoomEngine({ apiKey: 'k', localSimulator: () => ({ dialogues: [{ actorId: 'dg', text: 'Local.' }] }) })
+    const engine = new WarRoomEngine({ discoverModels: false,  apiKey: 'k', candidateModels: ['gemini-3.8-flash', 'gemini-3.8-flash-lite', 'gemini-2.5-flash'], localSimulator: () => ({ dialogues: [{ actorId: 'dg', text: 'Local.' }] }) })
     const turn = await engine.playTurn({ actors: ACTORS, userMessage: 'x', history: [] })
     assert.equal(calls, 4)
     assert.equal(turn._engineFallback, true)
@@ -181,7 +181,7 @@ describe('WarRoomEngine : porte des lignes rouges, dégressivité, appels limit�
 
   test('réplique recopiée d\'un tour précédent retirée', async () => {
     responder = () => reply(JSON.stringify({ dialogues: [{ actorId: 'rssi', text: 'Les 72 heures courent depuis 07h40.' }, { actorId: 'dg', text: 'Je veux le coût avant midi.' }], metricsImpact: {} }))
-    const engine = new WarRoomEngine({ apiKey: 'k' })
+    const engine = new WarRoomEngine({ discoverModels: false,  apiKey: 'k' })
     const history = [{ sender: 'rssi', text: 'Les 72 heures courent depuis 07h40.' }, { sender: 'user', text: 'On notifie.' }]
     const turn = await engine.playTurn({ actors: ACTORS, userMessage: 'Je propose la notification à 10 h.', history })
     assert.deepEqual(turn.dialogues.map((d) => d.actorId), ['dg'])

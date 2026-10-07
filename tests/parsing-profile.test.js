@@ -57,7 +57,7 @@ describe('parseGeminiJson', () => {
     const store = createGeminiSettingsStore('cyber_nexus')
     assert.equal(store.keys.apiKey, 'cyber_nexus_gemini_api_key')
     assert.equal(store.getApiKey(), '')
-    assert.equal(store.getModel(), 'gemini-2.5-flash')
+    assert.equal(store.getModel(), 'gemini-3.8-flash')
     store.saveApiKey('x')
   })
 })

@@ -161,16 +161,16 @@ describe('WarRoomEngine (essais, budget, contexte, plan)', () => {
 
   test('JSON tronqué : nouvel essai du même modèle avec plus de jetons et sans raisonnement, avant le modèle suivant', async () => {
     responder = (url, init, n) => (n === 1 ? geminiText('{"dialogues":[{"actorId":"dg","text":"Complet."},{"actorId":"rssi","text":"Je pen', 'MAX_TOKENS') : geminiText(okTurn))
-    const engine = new WarRoomEngine({ apiKey: 'k', maxTokens: 2048, thinkingBudget: 512 })
+    const engine = new WarRoomEngine({ discoverModels: false,  apiKey: 'k', maxTokens: 2048, thinkingBudget: 512 })
     const turn = await engine.playTurn({ actors: ACTORS, userMessage: 'Je propose un WAF.', history: [] })
     assert.equal(calls.length, 2)
-    assert.ok(calls[1].url.includes('gemini-2.5-flash:'))
+    assert.ok(calls[1].url.includes('gemini-3.8-flash:'))
     assert.equal(calls[0].body.generationConfig.maxOutputTokens, 2048)
     assert.equal(calls[1].body.generationConfig.maxOutputTokens, 8192)
     assert.deepEqual(calls[0].body.generationConfig.thinkingConfig, { thinkingBudget: 512 })
     assert.deepEqual(calls[1].body.generationConfig.thinkingConfig, { thinkingBudget: 0 })
     assert.equal(turn._retried, true)
-    assert.equal(turn._engineUsedModel, 'gemini-2.5-flash')
+    assert.equal(turn._engineUsedModel, 'gemini-3.8-flash')
   })
 
   test('thinkingBudget en table par modèle ou en fonction ; jamais envoyé aux modèles 2.0', () => {
@@ -183,15 +183,15 @@ describe('WarRoomEngine (essais, budget, contexte, plan)', () => {
 
   test('_fallbackReason : nokey, auth, http (quota), invalid', async () => {
     const local = () => ({ dialogues: [{ actorId: 'dg', text: 'Local.' }] })
-    assert.equal((await new WarRoomEngine({ localSimulator: local }).playTurn({ actors: ACTORS, userMessage: 'x' }))._fallbackReason, 'nokey')
+    assert.equal((await new WarRoomEngine({ discoverModels: false,  localSimulator: local }).playTurn({ actors: ACTORS, userMessage: 'x' }))._fallbackReason, 'nokey')
     responder = () => jsonResponse(403, { error: { message: 'denied' } })
-    assert.equal((await new WarRoomEngine({ apiKey: 'k', localSimulator: local }).playTurn({ actors: ACTORS, userMessage: 'x' }))._fallbackReason, 'auth')
+    assert.equal((await new WarRoomEngine({ discoverModels: false,  apiKey: 'k', localSimulator: local }).playTurn({ actors: ACTORS, userMessage: 'x' }))._fallbackReason, 'auth')
     responder = () => jsonResponse(429, { error: { message: 'quota', status: 'RESOURCE_EXHAUSTED' } })
-    const quota = await new WarRoomEngine({ apiKey: 'k', localSimulator: local }).playTurn({ actors: ACTORS, userMessage: 'x' })
+    const quota = await new WarRoomEngine({ discoverModels: false,  apiKey: 'k', localSimulator: local }).playTurn({ actors: ACTORS, userMessage: 'x' })
     assert.equal(quota._fallbackReason, 'http')
     assert.equal(quota._fallbackDetail, 'quota')
     responder = () => geminiText('pas de JSON ici')
-    const invalid = await new WarRoomEngine({ apiKey: 'k', localSimulator: local, candidateModels: ['gemini-2.5-flash'] }).playTurn({ actors: ACTORS, userMessage: 'x' })
+    const invalid = await new WarRoomEngine({ discoverModels: false,  apiKey: 'k', localSimulator: local, candidateModels: ['gemini-2.5-flash'] }).playTurn({ actors: ACTORS, userMessage: 'x' })
     assert.equal(invalid._fallbackReason, 'invalid')
     assert.equal(calls.length, 1 + 3 + 2)
   })
@@ -200,7 +200,7 @@ describe('WarRoomEngine (essais, budget, contexte, plan)', () => {
     let ctx = null
     responder = () => geminiText(okTurn)
     const history = [{ sender: 'user', text: '📋 [DÉCISION D\'ARBITRAGE ADOPTÉE] : Option B\n\nDétail' }, { sender: 'dg', text: 'Bien.' }, { sender: 'user', text: 'Je propose un WAF.' }]
-    const engine = new WarRoomEngine({
+    const engine = new WarRoomEngine({ discoverModels: false, 
       apiKey: 'k',
       systemPromptGenerator: (a, s, m, c) => { ctx = c; return 'PROMPT' },
       transcriptFilter: (tr) => tr.filter((e) => e.text !== 'Bien.')
@@ -226,7 +226,7 @@ describe('WarRoomEngine (essais, budget, contexte, plan)', () => {
   test('plan appliqué au tour Gemini : questions hors plan retirées, summary sans question, _planViolations', async () => {
     responder = () => geminiText(okTurn)
     const policy = createQuestionPolicy({ rate: 0, rng: seq(0.99) })
-    const engine = new WarRoomEngine({ apiKey: 'k', questionPolicy: policy })
+    const engine = new WarRoomEngine({ discoverModels: false,  apiKey: 'k', questionPolicy: policy })
     const turn = await engine.playTurn({ actors: ACTORS, userMessage: 'Je propose un WAF en blocage dès ce soir.', history: [] })
     assert.equal(turn.dialogues[0].question, null)
     // Réplique trop courte sans sa question : la question devient une affirmation (pas de référence orpheline)
@@ -239,7 +239,7 @@ describe('WarRoomEngine (essais, budget, contexte, plan)', () => {
 
   test('onPartial « merge » : tour partiel complété par le simulateur local', async () => {
     responder = () => geminiText('{"dialogues":[{"actorId":"dg","text":"Le budget tient."},{"actorId":"rssi","text":"Je pen', 'MAX_TOKENS')
-    const engine = new WarRoomEngine({ apiKey: 'k', onPartial: 'merge', candidateModels: ['gemini-2.5-flash'], localSimulator: () => ({ dialogues: [{ actorId: 'dg', text: 'Doublon.' }, { actorId: 'dpo', text: 'La CNIL sous 72 h.' }] }) })
+    const engine = new WarRoomEngine({ discoverModels: false,  apiKey: 'k', onPartial: 'merge', candidateModels: ['gemini-2.5-flash'], localSimulator: () => ({ dialogues: [{ actorId: 'dg', text: 'Doublon.' }, { actorId: 'dpo', text: 'La CNIL sous 72 h.' }] }) })
     const turn = await engine.playTurn({ actors: ACTORS, userMessage: 'x', history: [] })
     assert.deepEqual(turn.dialogues.map((d) => d.actorId), ['dg', 'dpo'])
     assert.equal(turn._truncated, true)
@@ -250,7 +250,7 @@ describe('WarRoomEngine (essais, budget, contexte, plan)', () => {
 describe('TechToBoardEngine : followUpQuestion', () => {
   test('EVALUATION_SCHEMA : followUpQuestion facultatif, réaction terminée par la question si note < 75', async () => {
     responder = () => geminiText(JSON.stringify({ score: 60, grade: 'B', feedback: ['Bien.'], stakeholderReaction: { text: '« Il me manque le coût. »' }, followUpQuestion: 'Combien, et sur quel budget ?' }))
-    const engine = new TechToBoardEngine({ apiKey: 'k' })
+    const engine = new TechToBoardEngine({ discoverModels: false,  apiKey: 'k' })
     const text = 'Nous avons une faille critique sur le portail patient. Le correctif est prêt et sera retesté jeudi. Je recommande de reporter l\'ouverture de 48 h pour valider la FARR. Le coût est limité à 12 k€ et le risque résiduel est faible.'
     const res = await engine.evaluateAnswer({ text, caseStudy: {}, stakeholder: ACTORS[0] })
     const schema = calls[0].body.generationConfig.responseSchema
