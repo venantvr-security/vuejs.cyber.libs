@@ -124,6 +124,12 @@ export {
   isQuestionSentence,
   classifyPlayerMessage,
   isManipulationAttempt,
+  isStructuralInjection,
+  // §3b verdict du modèle (assessment)
+  ASSESSMENT_MODES,
+  normalizeAssessment,
+  assessmentToEvals,
+  matchRedLineGroup,
   manipulationSignals,
   splitTrailingQuestion,
   markQuestions,
@@ -298,6 +304,10 @@ export class WarRoomEngine {
     this.transcriptFilter = typeof options.transcriptFilter === 'function' ? options.transcriptFilter : null
     this.normalizeLocal = options.normalizeLocal !== false
     this.redLineGate = options.redLineGate !== false
+    // Juge des lignes rouges et manipulations : 'model' (défaut) → le modèle rend un verdict structuré (assessment) qui
+    // alimente la porte des jauges et le suivi des questions ; les règles lexicales ne servent qu'au repli local.
+    // 'rules' → ancien comportement (règles lexicales partout).
+    this.redLineJudge = options.redLineJudge === 'rules' ? 'rules' : 'model'
     this.redLinePenalty = isPlainObject(options.redLinePenalty) || options.redLinePenalty === false ? options.redLinePenalty : undefined
     this.creditLedger = options.creditLedger && typeof options.creditLedger.assess === 'function' ? options.creditLedger : null
     this.maxCallsPerTurn = Number.isFinite(options.maxCallsPerTurn) && options.maxCallsPerTurn > 0 ? options.maxCallsPerTurn : 4
@@ -402,14 +412,33 @@ export class WarRoomEngine {
   }
 
   _record(turn) {
+    // Verdict du modèle (assessment) : seulement pour un tour réellement produit par le modèle
+    const fromModel = !!turn && !turn._engineFallback && this.redLineJudge === 'model' && isPlainObject(turn.assessment) && Array.isArray(turn.assessment.redLines)
+    if (turn) turn._judge = fromModel ? 'model' : 'rules'
     if (turn && this.enforcePlan && Array.isArray(turn.dialogues) && turn.dialogues.length) {
-      try { enforcePlan(turn, this._planned ? this._plan : null) } catch (e) { /* jamais bloquant */ }
+      let plan = this._planned ? this._plan : null
+      // Ligne rouge jugée par le modèle alors que le plan ne prévoyait pas de question : l'acteur concerné peut poser
+      // sa question de défi (sinon enforcePlan la retirerait)
+      if (fromModel && plan && !plan.ask) {
+        const hit = turn.assessment.redLines.find((r) => isPlainObject(r) && r.mode !== 'rejected' && isNonEmptyString(r.actorId))
+        if (hit) plan = { ...plan, ask: true, actorId: hit.actorId, topic: hit.label || null, kind: 'challenge', redLine: hit.mode, fromAssessment: true }
+      }
+      try { enforcePlan(turn, plan) } catch (e) { /* jamais bloquant */ }
     }
     const ctx = this._turnCtx
     if (turn && ctx && isNonEmptyString(ctx.userMessage)) {
-      // Porte des lignes rouges : aucune variation positive quand une ligne rouge est franchie ou testée
+      // Porte des lignes rouges : aucune variation positive quand une ligne rouge est franchie ou testée.
+      // Source : verdict du modèle quand il existe, règles lexicales pour le repli local.
       if (this.redLineGate) {
-        try { applyRedLineGate(turn, { userMessage: ctx.userMessage, actors: ctx.actors, penalty: this.redLinePenalty }) } catch (e) { /* jamais bloquant */ }
+        try { applyRedLineGate(turn, { userMessage: ctx.userMessage, actors: ctx.actors, penalty: this.redLinePenalty, assessment: fromModel ? turn.assessment : null }) } catch (e) { /* jamais bloquant */ }
+      }
+      if (fromModel && turn.assessment.manipulation) turn._manipulation = true
+      // Questions du comité que le modèle juge traitées : elles quittent les questions en attente
+      if (fromModel && this.questionPolicy && typeof this.questionPolicy.markAnswered === 'function') {
+        const at = this.questionPolicy.lastPlan?.turnIndex
+        for (const q of asList(turn.assessment.answeredQuestions)) {
+          try { this.questionPolicy.markAnswered(q.actorId, q.question, Number.isFinite(at) ? at : null) } catch (e) { /* jamais bloquant */ }
+        }
       }
       // Dégressivité : un énoncé déjà crédité ne rapporte plus
       if (this.creditLedger) {
@@ -497,7 +526,7 @@ export class WarRoomEngine {
     this._planned = false
     if (this.questionPolicy && typeof this.questionPolicy.plan === 'function') {
       try {
-        plan = this.questionPolicy.plan({ ...tc, scenario, userMessage, actors: actorList, transcript, targetActorId: target })
+        plan = this.questionPolicy.plan({ ...tc, scenario, userMessage, actors: actorList, transcript, targetActorId: target, judge: this.redLineJudge })
         this._planned = !!plan
       } catch (e) { plan = null }
     }
@@ -517,12 +546,12 @@ export class WarRoomEngine {
         : buildWarRoomSystemPrompt({ ...this.promptOptions, scenario, metrics, actors: actorList, conversation: this.conversation, schema: this.turnSchema })
       if (!isNonEmptyString(systemPrompt)) throw new Error('Prompt système vide')
       const directive = buildTurnDirective({
-        userMessage, transcript, actors: actorList, plan, targetActorId: target, playerLabel: this.conversation.playerLabel,
+        userMessage, transcript, actors: actorList, plan, targetActorId: target, playerLabel: this.conversation.playerLabel, judge: this.redLineJudge,
         replyTo: tc.replyTo || null, pending: tc.pending, answeredNow: tc.answeredNow, engagements: tc.engagements,
         extraLines: tc.extraLines, avoidPhrases: tc.avoidPhrases
       })
       const generationConfig = { responseMimeType: 'application/json', temperature: this.temperature, maxOutputTokens: this.maxTokens }
-      if (this.useResponseSchema) generationConfig.responseSchema = toResponseSchema(this.turnSchema, actorList, this.conversation)
+      if (this.useResponseSchema) generationConfig.responseSchema = toResponseSchema(this.turnSchema, actorList, { ...this.conversation, assessment: this.redLineJudge === 'model' })
       basePayload = {
         systemInstruction: { parts: [{ text: systemPrompt }] },
         contents: buildGeminiContents(transcript, directive, this._contentsOptions(userMessage)),

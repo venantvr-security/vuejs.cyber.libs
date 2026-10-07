@@ -146,7 +146,9 @@ describe('toResponseSchema / toLegacyShape', () => {
     assert.equal(item.properties.question.nullable, true)
     assert.deepEqual(rs.properties.metricsImpact.required, ['security', 'compliance', 'availability', 'teamResilience'])
     assert.equal(rs.properties.metricsImpact.properties.availability.type, 'INTEGER')
-    assert.deepEqual(rs.required, ['dialogues', 'metricsImpact'])
+    assert.deepEqual(rs.required, ['dialogues', 'metricsImpact', 'assessment'])
+    assert.deepEqual(rs.properties.assessment.required, ['redLines', 'manipulation', 'proposal', 'answeredQuestions'])
+    assert.deepEqual(toResponseSchema(DEPLOY_TURN_SCHEMA, ACTORS, { assessment: false }).required, ['dialogues', 'metricsImpact'])
   })
 
   test('toLegacyShape renomme pour deploy', () => {

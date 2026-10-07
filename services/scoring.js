@@ -92,13 +92,42 @@ function impactPenalty(assessments) {
  * pour l'ignorer, ou un objet pour l'imposer). Renvoie { gated, crossed, probed, zeroed, labels, families } et le
  * note dans turn._redLineGate quand quelque chose a été modifié ou détecté.
  */
-export function applyRedLineGate(turn, { userMessage = '', actors = [], assessments = null, redLines = null, penalty = undefined, impactKey = null } = {}) {
-  const info = { gated: false, crossed: false, probed: false, zeroed: [], labels: [], families: [] }
+export function applyRedLineGate(turn, { userMessage = '', actors = [], assessments = null, redLines = null, penalty = undefined, impactKey = null, assessment = undefined } = {}) {
+  const info = { gated: false, crossed: false, probed: false, zeroed: [], labels: [], families: [], source: 'rules' }
   if (!isPlainObject(turn)) return info
   const key = impactKey || (isPlainObject(turn.metricsImpact) ? 'metricsImpact' : isPlainObject(turn.metricsDelta) ? 'metricsDelta' : 'metricsImpact')
   const deltas = isPlainObject(turn[key]) ? turn[key] : {}
-  const red = redLines || detectRedLines(typeof userMessage === 'string' ? userMessage : '')
-  const evals = assessments || (asArray(actors).length ? assessAll(userMessage, actors, { hypotheticalAsQuestion: true }) : {})
+  // Verdict du modèle (assessment, voir normalizeAssessment) : il remplace les règles lexicales. assessment: undefined →
+  // verdict porté par le tour (turn.assessment) s'il existe ; null ou false → règles seulement.
+  const verdict = assessment === undefined ? (isPlainObject(turn.assessment) && Array.isArray(turn.assessment.redLines) ? turn.assessment : null) : (isPlainObject(assessment) ? assessment : null)
+  let red
+  let evals
+  if (verdict) {
+    info.source = 'model'
+    red = { crossed: [], probed: [], hasCrossed: false, hasProbed: false }
+    for (const r of verdict.redLines) {
+      if (!isPlainObject(r) || !r.family) continue
+      if (r.mode === 'crossed') { red.crossed.push({ family: r.family, label: r.label }); red.hasCrossed = true }
+      else if (r.mode === 'probed') { red.probed.push({ family: r.family, label: r.label }); red.hasProbed = true }
+    }
+    const byActor = {}
+    for (const r of verdict.redLines) {
+      if (!isPlainObject(r) || r.mode === 'rejected' || !r.actorId) continue
+      const slot = byActor[r.actorId] || (byActor[r.actorId] = { expectationsMet: [], expectationsMissed: [], redLinesCrossed: [], redLinesProbed: [] })
+      const list = r.mode === 'crossed' ? slot.redLinesCrossed : slot.redLinesProbed
+      if (!list.includes(r.label)) list.push(r.label)
+    }
+    // Les groupes du profil portent les plafonds d'impact : on les retrouve par libellé
+    evals = {}
+    for (const [actorId, slot] of Object.entries(byActor)) {
+      const actor = asArray(actors).find((a) => isPlainObject(a) && a.id === actorId)
+      const groups = asArray(actor?.profile?.redLines).filter((g) => isPlainObject(g))
+      evals[actorId] = { ...slot, redLineGroups: groups.filter((g) => slot.redLinesCrossed.includes(g.label)) }
+    }
+  } else {
+    red = redLines || detectRedLines(typeof userMessage === 'string' ? userMessage : '')
+    evals = assessments || (asArray(actors).length ? assessAll(userMessage, actors, { hypotheticalAsQuestion: true }) : {})
+  }
   const state = redLineGateState([red, evals])
   Object.assign(info, { crossed: state.crossed, probed: state.probed, labels: state.labels, families: state.families })
   if (!state.crossed && !state.probed) return info
@@ -107,7 +136,7 @@ export function applyRedLineGate(turn, { userMessage = '', actors = [], assessme
   for (const [k, v] of Object.entries(next)) if (deltas[k] !== v) info.zeroed.push(k)
   info.gated = info.zeroed.length > 0
   turn[key] = next
-  turn._redLineGate = { crossed: state.crossed, probed: state.probed, labels: state.labels, families: state.families, zeroed: info.zeroed }
+  turn._redLineGate = { crossed: state.crossed, probed: state.probed, labels: state.labels, families: state.families, zeroed: info.zeroed, source: info.source }
   return info
 }
 

@@ -574,7 +574,30 @@ Les tests (`node:test`) couvrent le corpus étiqueté des lignes rouges, injecti
 
 ---
 
+## Le modèle comme juge (lignes rouges, manipulation, questions traitées)
+
+Depuis la 1.4.0, quand une clé Gemini est présente, c'est le **modèle** qui juge l'intervention du joueur, pas des expressions régulières : le JSON de chaque tour contient un champ `assessment` qu'il remplit comme un juge indépendant des répliques.
+
+```json
+"assessment": {
+  "redLines": [ { "actorId": "dg", "label": "Dissimuler l'incident aux autorités", "mode": "crossed" } ],
+  "manipulation": false,
+  "proposal": true,
+  "answeredQuestions": [ { "actorId": "rssi", "question": "Quel délai pour le correctif ?" } ]
+}
+```
+
+- `mode` : `crossed` (proposée ou décidée, quel que soit le temps ou l'euphémisme), `probed` (vraie question exploratoire), `rejected` (explicitement écartée). Une mise en garde, une négation ou une mesure légitime qui partage des mots avec une ligne rouge ne figurent pas dans `redLines`.
+- `WarRoomEngine` (option `redLineJudge`, défaut `'model'`) : la consigne de tour ne contient plus les lignes « LIGNE ROUGE FRANCHIE » déduites des règles mais une consigne « JUGEMENT » ; `toResponseSchema(…, { assessment: true })` impose le champ ; `validateTurnWith` le normalise (`normalizeAssessment` : acteurs résolus, libellés ramenés au profil, `known`) ; `applyRedLineGate(turn, { assessment })` vide les gains et applique les plafonds `impact` du profil d'après le verdict ; `assessment.answeredQuestions` alimente `questionPolicy.markAnswered` (la question quitte les questions en attente) ; `assessment.manipulation` pose `turn._manipulation`. `turn._judge` vaut `'model'` ou `'rules'`.
+- Les règles lexicales (`detectRedLines`, `isManipulationAttempt`, `isQuestionTreated`) ne servent plus qu'au **moteur local** (sans clé ou en repli) et aux applications hors ligne. En mode juge, seule `isStructuralInjection` (pseudo-balises `[SYSTEM]`, `</context>`, « system: ») est encore appliquée avant l'appel, pour le plan.
+- `redLineJudge: 'rules'` rétablit l'ancien comportement. `describeTurnFormat(…, { assessment: false })` et `toResponseSchema(…, { assessment: false })` retirent le champ.
+- Côté application : lire `turn.assessment` (et non les règles) pour la synthèse, la réaction de l'acteur concerné et la porte des jauges quand `turn._judge === 'model'`.
+
 ## Journal des versions
+
+### 1.4.0
+- Le modèle juge l'intervention (`assessment` : lignes rouges par acteur avec mode, manipulation, proposition, questions traitées) ; `redLineJudge` sur `WarRoomEngine`, `normalizeAssessment`, `assessmentToEvals`, `matchRedLineGroup`, `isStructuralInjection`, `questionPolicy.markAnswered` ; `applyRedLineGate` accepte un verdict ; les règles lexicales restent pour le moteur local.
+- 1.3.0 : modèles Gemini découverts via l'API, `gemini-3.8-flash` par défaut.
 
 ### 1.2.0
 
