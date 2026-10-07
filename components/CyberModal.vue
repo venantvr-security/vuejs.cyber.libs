@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <div
-      v-if="open"
+      v-if="isOpenResolved"
       class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in"
       @mousedown="onBackdropDown"
       @click="onBackdropClick"
@@ -10,7 +10,7 @@
         ref="panel"
         role="dialog"
         aria-modal="true"
-        :aria-labelledby="$slots.title ? titleId : undefined"
+        :aria-labelledby="hasTitle ? titleId : undefined"
         tabindex="-1"
         class="glass-panel-elevated outline-none rounded-2xl w-full shadow-2xl border max-h-[92vh]"
         :class="[sizeClass, accentClasses.border, layout === 'flex' ? 'flex flex-col overflow-hidden' : 'p-5 sm:p-6 space-y-5 overflow-y-auto custom-scrollbar']"
@@ -25,11 +25,11 @@
               <slot name="icon"></slot>
             </div>
             <div class="min-w-0 space-y-1">
-              <h2 v-if="$slots.title" :id="titleId" class="font-heading text-base sm:text-lg font-bold text-slate-100 tracking-tight flex items-center gap-2 flex-wrap">
-                <slot name="title"></slot>
+              <h2 v-if="hasTitle" :id="titleId" class="font-heading text-base sm:text-lg font-bold text-slate-100 tracking-tight flex items-center gap-2 flex-wrap">
+                <slot name="title">{{ title }}</slot>
               </h2>
-              <p v-if="$slots.subtitle" class="text-sm text-slate-400">
-                <slot name="subtitle"></slot>
+              <p v-if="$slots.subtitle || subtitle" class="text-sm text-slate-400">
+                <slot name="subtitle">{{ subtitle }}</slot>
               </p>
               <slot name="header-extra"></slot>
             </div>
@@ -40,7 +40,7 @@
             class="p-2 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors flex-shrink-0"
             :aria-label="closeLabel || undefined"
             :title="closeLabel || undefined"
-            @click="emit('close')"
+            @click="handleClose"
           >
             <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M18 6 6 18" />
@@ -70,12 +70,28 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onBeforeUnmount, useId } from 'vue'
+import { ref, computed, watch, useSlots, nextTick, onBeforeUnmount, useId } from 'vue'
 
 const props = defineProps({
   open: {
     type: Boolean,
-    default: false
+    default: undefined
+  },
+  isOpen: {
+    type: Boolean,
+    default: undefined
+  },
+  modelValue: {
+    type: Boolean,
+    default: undefined
+  },
+  title: {
+    type: String,
+    default: ''
+  },
+  subtitle: {
+    type: String,
+    default: ''
   },
   accent: {
     type: String,
@@ -95,7 +111,22 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'update:modelValue'])
+const slots = useSlots()
+
+const isOpenResolved = computed(() => {
+  if (props.open !== undefined) return props.open
+  if (props.isOpen !== undefined) return props.isOpen
+  if (props.modelValue !== undefined) return props.modelValue
+  return false
+})
+
+const hasTitle = computed(() => !!slots.title || !!props.title)
+
+function handleClose() {
+  emit('close')
+  emit('update:modelValue', false)
+}
 
 // Lookup statique : Tailwind doit voir les classes complètes.
 const ACCENTS = {
@@ -158,7 +189,7 @@ function onBackdropDown(e) {
 }
 
 function onBackdropClick(e) {
-  if (pressedOnBackdrop && e.target === e.currentTarget) emit('close')
+  if (pressedOnBackdrop && e.target === e.currentTarget) handleClose()
   pressedOnBackdrop = false
 }
 
@@ -172,7 +203,7 @@ function onKeydown(e) {
     // Échap pendant une composition (IME, accents morts) annule la composition, pas la modale
     if (e.isComposing || e.keyCode === 229) return
     e.stopPropagation()
-    emit('close')
+    handleClose()
     return
   }
   if (e.key !== 'Tab' || !panel.value) return
@@ -229,7 +260,7 @@ function deactivate() {
 }
 
 watch(
-  () => props.open,
+  isOpenResolved,
   (isOpen) => {
     if (typeof window === 'undefined') return
     if (isOpen) activate()
