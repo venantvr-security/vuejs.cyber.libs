@@ -31,7 +31,11 @@
 @media (prefers-reduced-motion: reduce) {
   .animate-radar,
   .animate-float,
-  .animate-fade-in {
-    animation: none;
+  .animate-fade-in,
+  .animate-bounce,
+  .animate-spin,
+  .animate-pulse,
+  .animate-ping {
+    animation: none !important;
   }
 }

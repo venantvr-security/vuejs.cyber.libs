@@ -152,6 +152,11 @@
     @apply inline-flex items-center justify-center p-1 rounded text-slate-400 hover:text-cyan-300 hover:bg-slate-800/80 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cn-focus;
   }
 
+  /* Cible tactile : 44 px au moins sous sm ou au pointeur grossier (voir la règle hors @layer plus bas) */
+  .cn-touch {
+    @apply inline-flex items-center justify-center;
+  }
+
   /* Puce filtrable / onglet compact (rails de catégories, filtres) */
   .cn-chip {
     @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm whitespace-nowrap transition-colors bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700 cn-focus;
@@ -162,7 +167,7 @@
 
   /* Champs de saisie */
   .cn-input {
-    @apply w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/30 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none min-w-0;
+    @apply w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/30 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-400 focus:outline-none min-w-0;
   }
 
   /* Bulles de chat */
@@ -213,5 +218,22 @@
   }
   .cn-table tbody tr {
     @apply border-b border-slate-800/60 hover:bg-slate-800/30 transition-colors;
+  }
+}
+
+/* Cibles tactiles (WCAG 2.5.8 / 2.5.5) : 44 px au pointeur grossier ou sous sm.
+   Bouton principal désactivé : lisible (pas seulement une opacité réduite).
+   Dans @layer components, après les définitions ci-dessus : l'ordre de sortie de Tailwind est conservé. */
+@layer components {
+  @media (pointer: coarse), (max-width: 639px) {
+    .cn-touch,
+    .cn-icon-btn-sm {
+      min-width: 44px;
+      min-height: 44px;
+    }
+  }
+
+  .cn-btn-primary:disabled {
+    @apply opacity-100 bg-slate-700 text-slate-300;
   }
 }

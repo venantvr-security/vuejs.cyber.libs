@@ -11,6 +11,7 @@
           :class="isActive(item) ? ['cn-tab-active', accentOf(item).desktop] : ''"
           :aria-current="isActive(item) ? 'page' : undefined"
           :title="item.title || undefined"
+          v-bind="attrsOf(item)"
           @click="select(item)"
         >
           <component :is="item.icon" v-if="item.icon" class="w-4 h-4 shrink-0" :class="item.iconClass || iconClass" aria-hidden="true" />
@@ -21,8 +22,33 @@
       <slot name="desktop-end"></slot>
     </nav>
 
-    <!-- Mobile (< md) : grille segmentée, tout visible sans défilement -->
-    <nav class="grid md:hidden gap-1.5 py-2" :class="mobileGridClass" :aria-label="ariaLabel || undefined">
+    <!-- Mobile (< md), mobileLayout 'scroll' : une seule ligne défilante, accrochage, onglet actif gardé visible -->
+    <nav
+      v-if="mobileLayout === 'scroll'"
+      ref="mobileTrack"
+      class="flex md:hidden flex-nowrap gap-1.5 py-2 overflow-x-auto no-scrollbar overscroll-x-contain snap-x snap-mandatory scroll-px-3"
+      :aria-label="ariaLabel || undefined"
+      data-layout="scroll"
+    >
+      <button
+        v-for="item in items"
+        :key="item.id"
+        type="button"
+        class="shrink-0 snap-start flex items-center justify-center gap-1.5 px-3 min-h-[2.75rem] rounded-lg border text-xs font-medium whitespace-nowrap transition-all bg-slate-900/70 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 cn-focus cn-tab-mobile"
+        :class="isActive(item) ? ['cn-tab-mobile-active', accentOf(item).mobile] : ''"
+        :aria-current="isActive(item) ? 'page' : undefined"
+        :title="item.title || undefined"
+        v-bind="attrsOf(item)"
+        @click="select(item)"
+      >
+        <component :is="item.icon" v-if="item.icon" class="w-3.5 h-3.5 shrink-0" :class="item.iconClass || iconClass" aria-hidden="true" />
+        <span>{{ item.mobileLabel || item.label }}</span>
+        <span v-if="item.badge" class="cn-pill shrink-0 !py-0 !px-1.5 text-tiny" :class="item.badgeClass || 'cn-pill-cyan'">{{ item.badge }}</span>
+      </button>
+    </nav>
+
+    <!-- Mobile (< md), mobileLayout 'grid' (défaut) : grille segmentée, tout visible sans défilement -->
+    <nav v-else class="grid md:hidden gap-1.5 py-2" :class="mobileGridClass" :aria-label="ariaLabel || undefined" data-layout="grid">
       <button
         v-for="item in items"
         :key="item.id"
@@ -31,6 +57,7 @@
         :class="isActive(item) ? ['cn-tab-mobile-active', accentOf(item).mobile] : ''"
         :aria-current="isActive(item) ? 'page' : undefined"
         :title="item.title || undefined"
+        v-bind="attrsOf(item)"
         @click="select(item)"
       >
         <component :is="item.icon" v-if="item.icon" class="w-3.5 h-3.5 shrink-0" :class="item.iconClass || iconClass" aria-hidden="true" />
@@ -41,13 +68,15 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch, onMounted, nextTick } from 'vue'
 import CyberScrollRail from './CyberScrollRail.vue'
 
 /**
- * Navigation principale : rail desktop + grille mobile, à partir d'une seule liste.
- * items : [{ id, label, mobileLabel?, icon?, iconClass?, title?, badge?, badgeClass?, accent? ('cyan' | 'emerald') }]
- * Les libellés sont déjà traduits par l'application.
+ * Navigation principale : rail desktop + navigation mobile, à partir d'une seule liste.
+ * items : [{ id, label, mobileLabel?, icon?, iconClass?, title?, badge?, badgeClass?, accent? ('cyan' | 'emerald'),
+ *   testId? (→ data-testid), attrs? (attributs posés sur le bouton, ex. { 'data-view': 'warroom' }) }]
+ * mobileLayout : 'grid' (défaut, grille de mobileCols colonnes) ou 'scroll' (une ligne défilante avec accrochage,
+ * onglet actif gardé visible). Les libellés sont déjà traduits par l'application.
  */
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -58,7 +87,8 @@ const props = defineProps({
   // Visibilité des badges sur desktop (masqués sous xl par défaut)
   badgeClass: { type: String, default: 'hidden xl:inline-flex' },
   trackClass: { type: String, default: 'items-center gap-1' },
-  mobileCols: { type: Number, default: 3 }
+  mobileCols: { type: Number, default: 3 },
+  mobileLayout: { type: String, default: 'grid', validator: (v) => ['grid', 'scroll'].includes(v) }
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -74,6 +104,7 @@ const ACCENTS = {
 
 const MOBILE_COLS = { 2: 'grid-cols-2', 3: 'grid-cols-3', 4: 'grid-cols-4' }
 const mobileGridClass = computed(() => MOBILE_COLS[props.mobileCols] || MOBILE_COLS[3])
+const mobileTrack = ref(null)
 
 function isActive(item) {
   return props.modelValue === item.id
@@ -83,7 +114,29 @@ function accentOf(item) {
   return ACCENTS[item.accent] || ACCENTS.cyan
 }
 
+function attrsOf(item) {
+  const attrs = item && typeof item.attrs === 'object' && item.attrs ? { ...item.attrs } : {}
+  if (item?.testId && !('data-testid' in attrs)) attrs['data-testid'] = item.testId
+  return attrs
+}
+
 function select(item) {
   emit('update:modelValue', item.id)
 }
+
+// Ligne défilante : l'onglet actif reste visible
+function revealActive() {
+  const track = mobileTrack.value
+  if (!track || typeof track.querySelector !== 'function') return
+  const el = track.querySelector('[aria-current="page"]')
+  if (!el) return
+  const left = el.offsetLeft - track.offsetLeft
+  const right = left + el.offsetWidth
+  if (left < track.scrollLeft || right > track.scrollLeft + track.clientWidth) {
+    track.scrollTo?.({ left: Math.max(0, left - 12), behavior: 'smooth' })
+  }
+}
+
+onMounted(() => nextTick(revealActive))
+watch(() => props.modelValue, () => nextTick(revealActive))
 </script>

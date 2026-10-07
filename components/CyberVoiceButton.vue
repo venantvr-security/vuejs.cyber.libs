@@ -36,8 +36,8 @@ const props = defineProps({
   // Identifiant unique de la lecture (ex. `msg-${id}`)
   speechId: { type: String, required: true },
   text: { type: String, default: '' },
-  // Profil de voix (acteur, 'system', 'user', 'arbitration'…)
-  voice: { type: String, default: 'system' },
+  // Profil de voix : identifiant ('dg', 'system', 'user'…), acteur ({ id, voice }) ou profil ({ pitch, rate, female })
+  voice: { type: [String, Object], default: 'system' },
   playLabel: { type: String, default: '' },
   stopLabel: { type: String, default: '' },
   // Libellé visible (sinon seulement aria-label / title)

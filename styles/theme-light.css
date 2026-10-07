@@ -116,7 +116,15 @@ html.light select:focus {
 }
 
 html.light ::placeholder {
-  color: #94a3b8 !important;
+  color: #64748b !important;
+}
+
+/* Bouton principal désactivé : texte foncé sur gris clair (contraste AA) */
+html.light .cn-btn-primary:disabled {
+  opacity: 1 !important;
+  background-color: #e2e8f0 !important;
+  color: #475569 !important;
+  border-color: #cbd5e1 !important;
 }
 
 /* Modals & Backdrops */

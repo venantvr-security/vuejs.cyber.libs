@@ -1,19 +1,44 @@
 {
   "name": "vuejs.libs.nexus",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Shared library for Cyber, CTI and Deploy Nexus (visuals, roles, engines, services)",
   "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./preset": "./tailwind.preset.js",
+    "./conversation": "./services/conversation.js",
+    "./i18n": "./services/i18n.js",
+    "./theme": "./services/theme.js",
+    "./voice": "./services/voiceService.js",
+    "./red-lines": "./services/redLines.js",
+    "./scoring": "./services/scoring.js",
+    "./components": "./components/index.js",
+    "./package.json": "./package.json",
+    "./*": "./*"
+  },
   "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/venantvr-security/vuejs.libs.nexus.git"
   },
   "dependencies": {
-    "jsonrepair": "^3.15.0",
-    "lucide-vue-next": "^1.0.0"
+    "jsonrepair": "^3.15.0"
   },
   "peerDependencies": {
+    "lucide-vue-next": ">=0.363.0 <2",
     "tailwindcss": "^3.4.19",
+    "vue": "^3.4.21"
+  },
+  "peerDependenciesMeta": {
+    "tailwindcss": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "lucide-vue-next": "^1.0.0",
     "vue": "^3.5.0"
   }
 }

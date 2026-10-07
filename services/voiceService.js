@@ -3,6 +3,9 @@
 
 import { ref, getCurrentScope, onScopeDispose } from 'vue'
 
+// Voix choisie d'après l'acteur (actor.voice, puis table par identifiant), lecture en file,
+// relecture séquentielle d'une conversation (useConversationReplay).
+
 export const currentlySpeakingId = ref(null)
 export const isSpeakingGlobal = ref(false)
 
@@ -43,9 +46,55 @@ const ACTOR_VOICE_PROFILES = {
   soc_lead: { pitch: 0.95, rate: 1.1, female: false },  // Lead SOC (vif, opérationnel)
   ot_lead: { pitch: 1.10, rate: 1.0, female: true },    // Responsable OT / SCADA (prudente)
   cfo: { pitch: 0.85, rate: 0.95, female: false },      // Direction financière (posé, chiffré)
+  cto: { pitch: 1.10, rate: 1.05, female: true },       // Direction technique (DEPLOY : Valérie Moreau)
+  devsecops: { pitch: 0.92, rate: 1.1, female: false }, // Lead DevSecOps (rapide, concret)
+  dpo: { pitch: 0.88, rate: 0.95, female: false },      // DPO / juriste (mesuré)
   arbitration: { pitch: 1.05, rate: 1.0, female: false },
   system: { pitch: 1.0, rate: 1.05, female: false },
   user: { pitch: 1.0, rate: 1.0, female: false }
+}
+
+/**
+ * Ajoute ou remplace des profils de voix par identifiant d'acteur (table propre à l'application) :
+ * registerVoiceProfiles({ ciso: { pitch: 0.9, rate: 1, female: true } }). replace: true remplace toute la table
+ * (les profils 'system', 'user' et 'arbitration' restent disponibles). Renvoie la table résultante (copie).
+ */
+export function registerVoiceProfiles(table = {}, { replace = false } = {}) {
+  const base = { arbitration: ACTOR_VOICE_PROFILES.arbitration, system: ACTOR_VOICE_PROFILES.system, user: ACTOR_VOICE_PROFILES.user }
+  if (replace) for (const key of Object.keys(ACTOR_VOICE_PROFILES)) if (!(key in base)) delete ACTOR_VOICE_PROFILES[key]
+  for (const [id, profile] of Object.entries(table && typeof table === 'object' ? table : {})) {
+    if (!profile || typeof profile !== 'object') continue
+    const clean = {}
+    if (typeof profile.female === 'boolean') clean.female = profile.female
+    if (Number.isFinite(profile.pitch)) clean.pitch = Math.max(0, Math.min(2, profile.pitch))
+    if (Number.isFinite(profile.rate)) clean.rate = Math.max(0.1, Math.min(10, profile.rate))
+    ACTOR_VOICE_PROFILES[id] = { ...ACTOR_VOICE_PROFILES.system, ...(ACTOR_VOICE_PROFILES[id] || {}), ...clean }
+  }
+  return { ...ACTOR_VOICE_PROFILES }
+}
+
+/**
+ * Profil de voix { pitch, rate, female } d'un acteur : actor.voice (prioritaire, champs partiels acceptés),
+ * puis actor.gender ('f' | 'female' | 'm' | 'male'), puis la table par identifiant, puis 'system'.
+ * Accepte un acteur, un identifiant ou un profil déjà résolu.
+ */
+export function resolveVoiceProfile(actorOrId) {
+  const fallback = ACTOR_VOICE_PROFILES.system
+  if (typeof actorOrId === 'string') return { ...(ACTOR_VOICE_PROFILES[actorOrId] || fallback) }
+  if (!actorOrId || typeof actorOrId !== 'object') return { ...fallback }
+  // Profil déjà résolu ({ pitch, rate, female } sans id) ou acteur
+  const isProfile = !('id' in actorOrId) && ('pitch' in actorOrId || 'rate' in actorOrId || 'female' in actorOrId)
+  const profile = { ...fallback, ...(isProfile ? {} : ACTOR_VOICE_PROFILES[actorOrId.id] || {}) }
+  const gender = typeof actorOrId.gender === 'string' ? actorOrId.gender.toLowerCase() : ''
+  if (['f', 'female', 'femme'].includes(gender)) profile.female = true
+  if (['m', 'male', 'homme'].includes(gender)) profile.female = false
+  const voice = isProfile ? actorOrId : actorOrId.voice && typeof actorOrId.voice === 'object' ? actorOrId.voice : null
+  if (voice) {
+    if (typeof voice.female === 'boolean') profile.female = voice.female
+    if (Number.isFinite(voice.pitch)) profile.pitch = Math.max(0, Math.min(2, voice.pitch))
+    if (Number.isFinite(voice.rate)) profile.rate = Math.max(0.1, Math.min(10, voice.rate))
+  }
+  return profile
 }
 
 let cachedFrenchVoices = []
@@ -106,18 +155,29 @@ function selectBestVoice(isFemale) {
 // Énoncé en cours : les événements d'un énoncé annulé (onerror « interrupted »/« canceled », onend)
 // ne doivent pas modifier l'état de celui qui l'a remplacé
 let activeUtterance = null
+// Rappel « interrompu » de l'énoncé en cours : prévient une file de lecture qu'une autre lecture l'a remplacée
+let activeInterrupted = null
 
 export function stopSpeaking() {
+  const interrupted = activeInterrupted
   activeUtterance = null
+  activeInterrupted = null
   if (isSpeechSynthesisSupported()) {
     window.speechSynthesis.cancel()
   }
   currentlySpeakingId.value = null
   isSpeakingGlobal.value = false
+  if (typeof interrupted === 'function') {
+    try { interrupted() } catch (e) { /* rappel applicatif */ }
+  }
 }
 
-/** Lit un texte. Renvoie true si la lecture a été lancée. */
-export function speak(text, { actorId = 'system', onStart, onEnd, onError } = {}) {
+/**
+ * Lit un texte (interrompt la lecture en cours). Renvoie true si la lecture a été lancée.
+ * Voix : voiceProfile ({ pitch, rate, female } ou acteur, voir resolveVoiceProfile) prioritaire sur actorId
+ * (identifiant ou acteur). onInterrupted est appelé si une autre lecture ou stopSpeaking() l'interrompt.
+ */
+export function speak(text, { actorId = 'system', voiceProfile = null, onStart, onEnd, onError, onInterrupted } = {}) {
   if (!isSpeechSynthesisSupported() || !text) return false
 
   stopSpeaking()
@@ -125,7 +185,7 @@ export function speak(text, { actorId = 'system', onStart, onEnd, onError } = {}
   const cleanText = stripMarkdownForSpeech(text)
   if (!cleanText) return false
 
-  const profile = ACTOR_VOICE_PROFILES[actorId] || ACTOR_VOICE_PROFILES.system
+  const profile = voiceProfile ? resolveVoiceProfile(voiceProfile) : resolveVoiceProfile(actorId)
   const utterance = new SpeechSynthesisUtterance(cleanText)
   utterance.lang = 'fr-FR'
   utterance.pitch = profile.pitch
@@ -145,6 +205,7 @@ export function speak(text, { actorId = 'system', onStart, onEnd, onError } = {}
   utterance.onend = () => {
     if (activeUtterance !== utterance) return
     activeUtterance = null
+    activeInterrupted = null
     isSpeakingGlobal.value = false
     if (onEnd) onEnd()
   }
@@ -154,6 +215,7 @@ export function speak(text, { actorId = 'system', onStart, onEnd, onError } = {}
     // Énoncé remplacé ou arrêté volontairement : rien à signaler, l'état appartient au suivant
     if (activeUtterance !== utterance) return
     activeUtterance = null
+    activeInterrupted = null
     isSpeakingGlobal.value = false
     currentlySpeakingId.value = null
     if (!cancelled) console.warn('[VoiceService] Speech synthesis error:', err)
@@ -161,8 +223,67 @@ export function speak(text, { actorId = 'system', onStart, onEnd, onError } = {}
   }
 
   activeUtterance = utterance
+  activeInterrupted = typeof onInterrupted === 'function' ? onInterrupted : null
   window.speechSynthesis.speak(utterance)
   return true
+}
+
+/**
+ * File de lecture séquentielle : items = [{ id?, text, actorId?, voiceProfile? }], lus l'un après l'autre.
+ * Pendant la lecture d'un élément, currentlySpeakingId vaut son id (surlignage de la bulle).
+ * Renvoie { stop, done } (done : promesse résolue à la fin ou à l'arrêt) ; null si la synthèse est indisponible.
+ * Une autre lecture lancée entre-temps (bouton d'une bulle) arrête la file.
+ */
+export function speakQueue(items, { pauseMs = 250, onItemStart, onItemEnd, onDone } = {}) {
+  const list = (Array.isArray(items) ? items : []).filter((it) => it && typeof it.text === 'string' && it.text.trim())
+  if (!isSpeechSynthesisSupported() || !list.length) return null
+  let stopped = false
+  let index = -1
+  let timer = null
+  let resolveDone
+  const done = new Promise((resolve) => { resolveDone = resolve })
+  const finish = (completed) => {
+    if (stopped) return
+    stopped = true
+    clearTimeout(timer)
+    if (onDone) onDone({ completed, index })
+    resolveDone({ completed, index })
+  }
+  const next = () => {
+    if (stopped) return
+    index += 1
+    if (index >= list.length) { finish(true); return }
+    const item = list[index]
+    const started = speak(item.text, {
+      actorId: item.actorId || 'system',
+      voiceProfile: item.voiceProfile || null,
+      onStart: () => { if (!stopped && item.id !== undefined) currentlySpeakingId.value = item.id },
+      onEnd: () => {
+        if (stopped) return
+        if (item.id !== undefined && currentlySpeakingId.value === item.id) currentlySpeakingId.value = null
+        if (onItemEnd) onItemEnd(item, index)
+        timer = setTimeout(next, pauseMs)
+      },
+      onError: (err) => {
+        const cancelled = err?.error === 'interrupted' || err?.error === 'canceled'
+        if (cancelled) finish(false)
+        else timer = setTimeout(next, pauseMs)
+      },
+      onInterrupted: () => finish(false)
+    })
+    if (!started) { timer = setTimeout(next, 0); return }
+    if (item.id !== undefined) currentlySpeakingId.value = item.id
+    if (onItemStart) onItemStart(item, index)
+  }
+  next()
+  return {
+    stop() {
+      if (stopped) return
+      finish(false)
+      stopSpeaking()
+    },
+    done
+  }
 }
 
 // Composable for Text-to-Speech in components
@@ -170,7 +291,8 @@ export function useVoiceSynthesis() {
   // Dernier identifiant lu par ce composant : seul celui-ci est interrompu au démontage
   let ownedId = null
 
-  function play(id, text, actorId = 'system') {
+  // voice : identifiant de profil ('dg', 'system'…), acteur ({ id, voice }) ou profil ({ pitch, rate, female })
+  function play(id, text, voice = 'system') {
     if (currentlySpeakingId.value === id) {
       stopSpeaking()
       return
@@ -178,7 +300,8 @@ export function useVoiceSynthesis() {
 
     // speak() commence par stopSpeaking() : l'identifiant est posé après, sinon il serait effacé
     const started = speak(text, {
-      actorId,
+      actorId: typeof voice === 'string' ? voice : 'system',
+      voiceProfile: voice && typeof voice === 'object' ? voice : null,
       onStart: () => {
         currentlySpeakingId.value = id
       },
@@ -220,8 +343,96 @@ export function useVoiceSynthesis() {
   }
 }
 
-// Composable for Speech Recognition / Voice Dictation (Google Chrome STT)
-export function useVoiceDictation({ onTranscript, onError } = {}) {
+/**
+ * Relecture vocale séquentielle d'une conversation (Chrome / Web Speech API).
+ * replay(messages, options) lit les messages dans l'ordre à partir de `from` :
+ * - resolveActor(msg) → acteur (sa voix : resolveVoiceProfile) ; défaut : msg.sender / msg.actorId ;
+ * - skip : expéditeurs ignorés (défaut ['system']) ; textOf(msg) : texte lu (défaut msg.text, puis msg.summary) ;
+ * - idOf(msg, i) : identifiant de lecture, à aligner sur le speechId des bulles (défaut `msg-${msg.id ?? i}`).
+ * isReplaying / currentIndex sont réactifs ; stop() arrête proprement ; démontage du composant = arrêt.
+ * Renvoie false si la synthèse vocale est indisponible ou s'il n'y a rien à lire.
+ */
+export function useConversationReplay() {
+  const isReplaying = ref(false)
+  const currentIndex = ref(-1)
+  let queue = null
+
+  function stop() {
+    const q = queue
+    queue = null
+    isReplaying.value = false
+    currentIndex.value = -1
+    if (q) q.stop()
+  }
+
+  function replay(messages, { resolveActor, from = 0, skip = ['system'], textOf, idOf, pauseMs = 250 } = {}) {
+    stop()
+    const source = Array.isArray(messages) ? messages : []
+    const items = []
+    source.forEach((msg, i) => {
+      if (i < from || !msg || typeof msg !== 'object') return
+      if (Array.isArray(skip) && skip.includes(msg.sender)) return
+      const text = typeof textOf === 'function' ? textOf(msg) : (typeof msg.text === 'string' && msg.text) || (typeof msg.summary === 'string' && msg.summary) || ''
+      if (!text || !String(text).trim()) return
+      const actor = typeof resolveActor === 'function' ? resolveActor(msg) : null
+      const isUser = msg.sender === 'user' || msg.sender === 'player' || msg.sender === 'decision'
+      const fallbackId = isUser ? 'user' : msg.sender === 'arbitration' ? 'arbitration' : (msg.actorId || msg.sender || 'system')
+      items.push({
+        id: typeof idOf === 'function' ? idOf(msg, i) : `msg-${msg.id ?? i}`,
+        text: String(text),
+        actorId: typeof fallbackId === 'string' ? fallbackId : 'system',
+        voiceProfile: actor && typeof actor === 'object' ? actor : null,
+        index: i
+      })
+    })
+    if (!items.length) return false
+    const q = speakQueue(items, {
+      pauseMs,
+      onItemStart: (item) => { currentIndex.value = item.index },
+      onDone: () => {
+        if (queue !== q) return
+        queue = null
+        isReplaying.value = false
+        currentIndex.value = -1
+      }
+    })
+    if (!q) return false
+    queue = q
+    isReplaying.value = true
+    return true
+  }
+
+  if (getCurrentScope()) onScopeDispose(stop)
+
+  return { isReplaying, currentIndex, replay, stop, isSupported: isSpeechSynthesisSupported() }
+}
+
+// Messages d'erreur par défaut de la dictée (français) ; remplaçables par l'option messages
+export const DICTATION_MESSAGES_FR = Object.freeze({
+  unsupported: "La reconnaissance vocale n'est pas supportée par ce navigateur.",
+  notAllowed: "Microphone non autorisé : autorisez l'accès au micro dans votre navigateur (icône cadenas/caméra).",
+  permission: "Microphone non autorisé : autorisez le micro dans Chrome (cliquez sur le cadenas à gauche de l'URL).",
+  network: 'Service vocal Google inaccessible (erreur réseau). Vérifiez votre connexion ou utilisez Google Chrome officiel.',
+  audioCapture: 'Aucun microphone détecté sur votre système.',
+  startFailed: 'Impossible de démarrer la reconnaissance vocale.',
+  generic: 'Erreur dictée ({error}).'
+})
+
+/**
+ * Dictée vocale (Web Speech API, Chrome). Options :
+ * - onTranscript(texte), onError(err) ;
+ * - lang : langue de reconnaissance ('fr-FR' par défaut) : chaîne, ref ou fonction (lue à chaque démarrage,
+ *   pour suivre la langue de l'interface : lang: () => (currentLocale.value === 'en' ? 'en-US' : 'fr-FR')) ;
+ * - messages : messages d'erreur (clés de DICTATION_MESSAGES_FR ; '{error}' remplacé par le code d'erreur).
+ */
+export function useVoiceDictation({ onTranscript, onError, lang = 'fr-FR', messages = {} } = {}) {
+  const msg = (key, error = '') => String((messages && messages[key]) || DICTATION_MESSAGES_FR[key] || '').replace('{error}', error)
+  const langOf = () => {
+    let value = lang
+    if (typeof value === 'function') { try { value = value() } catch (e) { value = null } }
+    if (value && typeof value === 'object' && 'value' in value) value = value.value
+    return typeof value === 'string' && value.trim() ? value.trim() : 'fr-FR'
+  }
   const isListening = ref(false)
   const dictationError = ref(null)
   let activeInstance = null
@@ -233,7 +444,7 @@ export function useVoiceDictation({ onTranscript, onError } = {}) {
   function startRecognitionEngine() {
     if (!shouldBeListening || disposed) return
     if (!isSpeechRecognitionSupported()) {
-      dictationError.value = "La reconnaissance vocale n'est pas supportée par ce navigateur."
+      dictationError.value = msg('unsupported')
       isListening.value = false
       shouldBeListening = false
       return
@@ -250,7 +461,7 @@ export function useVoiceDictation({ onTranscript, onError } = {}) {
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     const instance = new SpeechRecognition()
-    instance.lang = 'fr-FR'
+    instance.lang = langOf()
     instance.continuous = true
     instance.interimResults = true
     instance.maxAlternatives = 1
@@ -295,16 +506,16 @@ export function useVoiceDictation({ onTranscript, onError } = {}) {
       }
 
       if (err.error === 'not-allowed') {
-        dictationError.value = "Microphone non autorisé : autorisez l'accès au micro dans votre navigateur (icône cadenas/caméra)."
+        dictationError.value = msg('notAllowed')
         shouldBeListening = false
       } else if (err.error === 'network') {
-        dictationError.value = "Service vocal Google inaccessible (erreur réseau). Vérifiez votre connexion ou utilisez Google Chrome officiel."
+        dictationError.value = msg('network')
         shouldBeListening = false
       } else if (err.error === 'audio-capture') {
-        dictationError.value = "Aucun microphone détecté sur votre système."
+        dictationError.value = msg('audioCapture')
         shouldBeListening = false
       } else if (err.error !== 'aborted') {
-        dictationError.value = `Erreur dictée (${err.error}).`
+        dictationError.value = msg('generic', err.error)
         shouldBeListening = false
       }
 
@@ -338,7 +549,7 @@ export function useVoiceDictation({ onTranscript, onError } = {}) {
       isListening.value = true
     } catch (err) {
       console.warn('[VoiceDictation] Failed to start recognition instance:', err)
-      dictationError.value = "Impossible de démarrer la reconnaissance vocale."
+      dictationError.value = msg('startFailed')
       isListening.value = false
       shouldBeListening = false
     }
@@ -347,7 +558,7 @@ export function useVoiceDictation({ onTranscript, onError } = {}) {
   async function start(initialText = '') {
     if (disposed) return false
     if (!isSpeechRecognitionSupported()) {
-      dictationError.value = "La reconnaissance vocale n'est pas supportée par ce navigateur."
+      dictationError.value = msg('unsupported')
       return false
     }
 
@@ -363,7 +574,7 @@ export function useVoiceDictation({ onTranscript, onError } = {}) {
         stream.getTracks().forEach(track => track.stop())
       } catch (permErr) {
         console.warn('[VoiceDictation] Microphone permission error:', permErr)
-        dictationError.value = "Microphone non autorisé : autorisez le micro dans Chrome (cliquez sur le cadenas à gauche de l'URL)."
+        dictationError.value = msg('permission')
         isListening.value = false
         shouldBeListening = false
         if (onError) onError(permErr)

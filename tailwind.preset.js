@@ -1,5 +1,8 @@
 // tailwind.preset.js — thème partagé NEXUS (CYBER-NEXUS, CTI-NEXUS, DEPLOY-NEXUS)
-import plugin from 'tailwindcss/plugin'
+// Équivalent exact de tailwindcss/plugin (v3 : createPlugin renvoie { handler, config }) : le preset ne
+// dépend plus de tailwindcss à l'import, ce qui rend le module principal importable sous Node et dans le
+// navigateur sans tirer de code de build (F6)
+const plugin = (handler, config) => ({ handler, config })
 
 // Palettes Tailwind v3 (triplets RGB) pilotées par variables CSS.
 // Mode nuit : valeurs d'origine. Mode jour (html.light) : échelle inversée,

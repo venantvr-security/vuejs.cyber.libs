@@ -115,7 +115,7 @@ const moodColor = computed(() => {
           v-if="currentPreset.sampleQuote"
           :speech-id="`actor-quote-${actor.id}`"
           :text="currentPreset.sampleQuote"
-          :voice="actor.id"
+          :voice="actor"
           :play-label="t('ac_play_audio')"
           :stop-label="t('ac_stop_audio')"
           size="md"
@@ -180,7 +180,7 @@ const moodColor = computed(() => {
             <CyberVoiceButton
               :speech-id="`actor-quote-${actor.id}`"
               :text="currentPreset.sampleQuote"
-              :voice="actor.id"
+              :voice="actor"
               :play-label="t('ac_play_audio')"
               :stop-label="t('ac_stop_audio')"
               class="p-1 rounded hover:bg-cyan-500/20 text-cyan-300 hover:text-cyan-100"

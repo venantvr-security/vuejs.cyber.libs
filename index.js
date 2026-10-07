@@ -1,309 +1,622 @@
-import { jsonrepair } from 'jsonrepair'
+// vuejs.libs.nexus — point d'entrée JavaScript (pur : ni .vue, ni Vue, ni tailwindcss, importable sous Node).
+// Composants : 'vuejs.libs.nexus/components/<Nom>.vue' ou le barrel 'vuejs.libs.nexus/components/index.js'.
+// Composables Vue : 'vuejs.libs.nexus/services/voiceService.js', 'vuejs.libs.nexus/i18n', 'vuejs.libs.nexus/theme'.
+// Preset Tailwind : 'vuejs.libs.nexus/preset' (ou 'vuejs.libs.nexus/tailwind.preset.js').
+
+import {
+  DEFAULT_GEMINI_MODEL,
+  FALLBACK_GEMINI_MODELS,
+  GEMINI_REQUEST_TIMEOUT_MS,
+  isPlainObject,
+  cleanApiKey,
+  cleanModelName,
+  modelsToTry,
+  supportsThinking,
+  geminiFetch,
+  httpError,
+  isFatalGeminiError,
+  candidateText,
+  parseGeminiJson,
+  parseGeminiJsonDetailed,
+  listGeminiModels
+} from './services/gemini.js'
 import { containsTerm, matchTermGroups, describeStakeholderForPrompt, assessAgainstStakeholder, normalize } from './services/stakeholderProfile.js'
+import {
+  CYBER_TURN_SCHEMA,
+  toTranscript,
+  buildGeminiContents,
+  buildTurnDirective,
+  buildWarRoomSystemPrompt,
+  validateTurnWith,
+  toResponseSchema,
+  enforcePlan,
+  appendQuestion,
+  similarity
+} from './services/conversation.js'
+import { applyRedLineGate, diminishingReturns, applyDiminishingReturns } from './services/scoring.js'
 
-// La famille gemini-1.5 est retirée : chaque appel échouait et basculait sur le moteur local
-export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
-export const FALLBACK_GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash']
+export {
+  DEFAULT_GEMINI_MODEL,
+  FALLBACK_GEMINI_MODELS,
+  GEMINI_REQUEST_TIMEOUT_MS,
+  parseGeminiJson,
+  parseGeminiJsonDetailed,
+  listGeminiModels,
+  isFatalGeminiError,
+  supportsThinking,
+  createGeminiSettingsStore,
+  DEFAULT_MODEL_EXCLUDES
+} from './services/gemini.js'
 
-export { containsTerm, matchTermGroups, findMentionedActors, describeStakeholderForPrompt, assessAgainstStakeholder, normalize } from './services/stakeholderProfile.js'
+export {
+  containsTerm,
+  matchTermGroups,
+  findMentionedActors,
+  findAddressedActors,
+  describeStakeholderForPrompt,
+  assessAgainstStakeholder,
+  assessAll,
+  mergeStakeholderForScenario,
+  shortRegulatoryRef,
+  RED_LINE_PATTERNS,
+  REQUIREMENT_PATTERNS,
+  meetsRequirements,
+  normalize,
+  splitSentences,
+  isHypotheticalSentence
+} from './services/stakeholderProfile.js'
 
-// ---------------------------------------------------------------------------------------------
-// Accès HTTP à l'API Gemini
-// ---------------------------------------------------------------------------------------------
+export {
+  RED_LINE_FAMILIES,
+  RED_LINE_FAMILY_KEYS,
+  RED_LINE_TARGETS,
+  RED_LINE_CONTROLS,
+  detectRedLines,
+  familyHit,
+  redLineModality,
+  isExploratoryQuestion,
+  isWarningSentence,
+  resolveFamilySpec,
+  linkRedLineFamilies,
+  withRedLineFamilies
+} from './services/redLines.js'
 
-const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta'
-export const GEMINI_REQUEST_TIMEOUT_MS = 20000
-// Clé invalide ou requête refusée : inutile d'essayer les modèles suivants
-const FATAL_HTTP_STATUSES = new Set([400, 401, 403])
+export {
+  redLineGateState,
+  gateDeltas,
+  applyRedLineGate,
+  createCreditLedger,
+  statementKey,
+  diminishingReturns,
+  applyDiminishingReturns
+} from './services/scoring.js'
 
-function cleanApiKey(apiKey) {
-  return typeof apiKey === 'string' ? apiKey.trim() : ''
-}
+export {
+  // §1 règles et prompt
+  buildConversationRules,
+  CONVERSATION_RULES_FR,
+  buildWarRoomSystemPrompt,
+  describeActorForWarRoom,
+  describeTurnFormat,
+  // §2 consigne de tour et politique de questions
+  buildTurnDirective,
+  neutralizeDelimiters,
+  createQuestionPolicy,
+  enforcePlan,
+  stripQuestions,
+  toIndirectQuestion,
+  questionToStatement,
+  truncateAtSentence,
+  redLineOwner,
+  // §3 questions
+  detectQuestions,
+  isQuestionSentence,
+  classifyPlayerMessage,
+  isManipulationAttempt,
+  manipulationSignals,
+  splitTrailingQuestion,
+  markQuestions,
+  originalQuestion,
+  questionKey,
+  sameQuestion,
+  // §4 historique et suivi des questions
+  toTranscript,
+  buildGeminiContents,
+  analyzeQuestions,
+  pendingQuestions,
+  isQuestionTreated,
+  meaningfulStems,
+  recentPhrases,
+  repeatedPhrases,
+  // §5 répondants
+  pickRespondents,
+  // §6 schéma et validation
+  createTurnSchema,
+  CYBER_TURN_SCHEMA,
+  CTI_TURN_SCHEMA,
+  DEPLOY_TURN_SCHEMA,
+  INTENTS,
+  validateTurnWith,
+  toResponseSchema,
+  toLegacyShape,
+  // §7 répliques sans répétition
+  createReplyPicker,
+  similarity,
+  isRepetitive,
+  // §8 relances locales
+  buildFollowUpQuestion,
+  appendQuestion,
+  // §11 rendu et utilitaires
+  typingDelay,
+  readingPause,
+  formatChatText,
+  frenchTypography,
+  countWords,
+  contentWords,
+  firstNameOf,
+  lowerFirst
+} from './services/conversation.js'
 
-function cleanModelName(model) {
-  return typeof model === 'string' ? model.trim().replace(/^models\//, '') : ''
-}
+/** Composants Vue fournis par la lib (import : 'vuejs.libs.nexus/components/<Nom>.vue'). */
+export const NEXUS_COMPONENTS = Object.freeze([
+  'CyberAccordion', 'CyberActorCard', 'CyberAdmiraltyMatrix', 'CyberBrand', 'CyberCardCollapsible', 'CyberChatBubble',
+  'CyberDictationButton', 'CyberEmptyState', 'CyberFocusDictation', 'CyberFooter', 'CyberFormulaTooltip', 'CyberGauge',
+  'CyberInlineAlert', 'CyberModal', 'CyberNavTabs', 'CyberPageHeader', 'CyberRaciMatrix', 'CyberScrollRail',
+  'CyberSegmented', 'CyberSidebarRailText', 'CyberStatTile', 'CyberTermTooltip', 'CyberTlpBadge', 'CyberTlpText',
+  'CyberVoiceButton'
+])
 
-/** Modèle préféré puis modèles de repli, sans doublon ni préfixe « models/ ». */
-function modelsToTry(preferred, candidates) {
-  const list = [preferred, ...(Array.isArray(candidates) ? candidates : FALLBACK_GEMINI_MODELS)]
-  return Array.from(new Set(list.map(cleanModelName).filter(Boolean)))
-}
+const isNonEmptyString = (value) => typeof value === 'string' && value.trim() !== ''
 
-// Signal d'expiration (AbortSignal.timeout si disponible, sinon AbortController + minuterie)
-function timeoutSignal(ms) {
-  if (!(ms > 0)) return undefined
-  try {
-    if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') return AbortSignal.timeout(ms)
-  } catch (e) { /* environnement sans AbortSignal.timeout */ }
-  if (typeof AbortController === 'function') {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), ms)
-    if (timer && typeof timer.unref === 'function') timer.unref()
-    return controller.signal
-  }
-  return undefined
-}
-
-/** Appel Gemini : clé transmise en en-tête (jamais dans l'URL), délai maximal borné. */
-function geminiFetch(path, apiKey, { body, timeoutMs = GEMINI_REQUEST_TIMEOUT_MS } = {}) {
-  const headers = { 'x-goog-api-key': apiKey }
-  const init = { method: body ? 'POST' : 'GET', headers }
-  if (body) {
-    headers['Content-Type'] = 'application/json'
-    init.body = JSON.stringify(body)
-  }
-  const signal = timeoutSignal(timeoutMs)
-  if (signal) init.signal = signal
-  return fetch(`${GEMINI_API_BASE}/${path}`, init)
-}
-
-async function httpError(response, model) {
-  const errObj = await response.json().catch(() => ({}))
-  const err = new Error(errObj?.error?.message || `HTTP ${response.status}${model ? ` sur modèle ${model}` : ''}`)
-  err.status = response.status
-  if (model) err.model = model
+function abortError() {
+  const err = new Error('Tour de War Room annulé')
+  err.name = 'AbortError'
   return err
 }
 
-/** Texte de la première réponse, ou erreur décrivant pourquoi il manque (finishReason, blocage). */
-function candidateText(data, model) {
-  const candidate = data?.candidates?.[0]
-  const parts = candidate?.content?.parts
-  // Les parties « thought » (raisonnement des modèles 2.5) ne font pas partie de la réponse
-  const text = Array.isArray(parts) ? parts.map((p) => (typeof p?.text === 'string' && !p.thought ? p.text : '')).join('') : ''
-  if (text.trim()) return { text }
-  const finishReason = candidate?.finishReason || data?.promptFeedback?.blockReason || null
-  const err = new Error(`Réponse Gemini vide${finishReason ? ` (finishReason : ${finishReason})` : ''} sur modèle ${model}`)
-  err.finishReason = finishReason
-  err.model = model
-  return { error: err }
+/**
+ * Budget de raisonnement d'un modèle : nombre (tous modèles), fonction (model) → nombre | undefined, ou table
+ * { 'gemini-2.5-pro': 512, pro: 512, default: 0 } (clé exacte, puis clé contenue dans le nom, puis default).
+ * undefined : thinkingConfig non envoyé. Jamais envoyé aux modèles sans raisonnement (familles < 2.5).
+ */
+export function resolveThinkingBudget(budget, model) {
+  const name = cleanModelName(model)
+  let value
+  if (typeof budget === 'function') {
+    try { value = budget(name) } catch (e) { value = undefined }
+  } else if (isPlainObject(budget)) {
+    if (Number.isFinite(budget[name])) value = budget[name]
+    else {
+      const key = Object.keys(budget).filter((k) => k !== 'default' && name.includes(k)).sort((a, b) => b.length - a.length)[0]
+      value = key !== undefined ? budget[key] : budget.default
+    }
+  } else value = budget
+  return Number.isFinite(value) && supportsThinking(name) ? value : undefined
 }
 
-const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
+// Les modèles « pro » imposent un raisonnement : budget 0 refusé
+const canDisableThinking = (model) => supportsThinking(model) && !/pro/i.test(cleanModelName(model))
+
+/** Raison d'une bascule locale : 'nokey' | 'auth' | 'http' | 'invalid' | 'error' (+ détail 'quota' | 'timeout' | null). */
+function fallbackReasonOf(err, { noKey = false } = {}) {
+  if (noKey) return { reason: 'nokey', detail: null }
+  if (!err) return { reason: 'error', detail: null }
+  if (isFatalGeminiError(err)) return { reason: 'auth', detail: null }
+  const timeout = err.name === 'TimeoutError' || (err.name === 'AbortError' && /timeout/i.test(err.message || '')) || /timed? ?out|délai/i.test(err.message || '')
+  if (err.status === 429 || err.reason === 'RESOURCE_EXHAUSTED') return { reason: 'http', detail: 'quota' }
+  if (Number.isFinite(err.status)) return { reason: 'http', detail: null }
+  if (timeout) return { reason: 'http', detail: 'timeout' }
+  if (err.invalidOutput || /JSON|Réponse Gemini|réplique exploitable|vide/i.test(err.message || '')) return { reason: 'invalid', detail: null }
+  return { reason: 'error', detail: null }
+}
 
 // ---------------------------------------------------------------------------------------------
-// Lecture du JSON renvoyé par le modèle
+// War Room
 // ---------------------------------------------------------------------------------------------
-
-/** Premier objet JSON du texte : accolade ouvrante et sa fermante équilibrée (chaînes et échappements compris). */
-function extractFirstJsonObject(text) {
-  const start = text.indexOf('{')
-  if (start === -1) return null
-  let depth = 0
-  let inString = false
-  let escaped = false
-  for (let i = start; i < text.length; i++) {
-    const c = text[i]
-    if (inString) {
-      if (escaped) escaped = false
-      else if (c === '\\') escaped = true
-      else if (c === '"') inString = false
-      continue
-    }
-    if (c === '"') inString = true
-    else if (c === '{') depth++
-    else if (c === '}') {
-      depth--
-      if (depth === 0) return { json: text.slice(start, i + 1), complete: true }
-    }
-  }
-  // JSON tronqué (il manque des fermetures) : jsonrepair complètera
-  return { json: text.slice(start), complete: false }
-}
-
-function parseJsonObject(rawText) {
-  if (typeof rawText !== 'string' || !rawText.trim()) {
-    throw new Error('Réponse vide reçue de Gemini')
-  }
-  const extracted = extractFirstJsonObject(rawText)
-  if (!extracted) throw new Error('Format JSON irrécupérable : aucun objet JSON dans la réponse')
-  let parsed
-  try {
-    parsed = extracted.complete ? JSON.parse(extracted.json) : JSON.parse(jsonrepair(extracted.json))
-  } catch (firstErr) {
-    try {
-      parsed = JSON.parse(jsonrepair(extracted.json))
-    } catch (err) {
-      throw new Error(`Format JSON irrécupérable : ${err.message}`)
-    }
-  }
-  if (!isPlainObject(parsed)) throw new Error('Format JSON irrécupérable : un objet JSON était attendu')
-  return parsed
-}
 
 export class WarRoomEngine {
   /**
-   * Initialise le moteur de War Room.
+   * Moteur de tour de War Room : Gemini d'abord (nouvel essai du même modèle sur réponse tronquée ou invalide,
+   * puis repli multi-modèles), simulateur local ensuite.
    * @param {Object} options
-   * @param {string} options.apiKey Clé API Gemini
-   * @param {string} options.model Modèle préféré (ex: 'gemini-2.5-flash')
-   * @param {Function} options.systemPromptGenerator Fonction retournant le prompt système
-   * @param {Function} options.localSimulator Fonction de fallback si Gemini échoue
-   * @param {number} options.maxTokens (Optionnel) Max tokens, defaut 2048
-   * @param {string[]} options.candidateModels (Optionnel) Modèles de repli, défaut FALLBACK_GEMINI_MODELS
-   * @param {number} options.timeoutMs (Optionnel) Délai maximal d'un appel, défaut 20000 ms
+   * @param {string} [options.apiKey] Clé API Gemini (sans clé : simulateur local)
+   * @param {string} [options.model] Modèle préféré (défaut DEFAULT_GEMINI_MODEL)
+   * @param {Function} [options.systemPromptGenerator] (actors, scenario, metrics, ctx) → prompt système.
+   *   ctx = { plan, transcript, targetActorId, schema, conversation, userMessage, history (brut), session { turn, decisionTitle },
+   *   turnContext }. Absent : buildWarRoomSystemPrompt(promptOptions).
+   * @param {Object} [options.promptOptions] Options de buildWarRoomSystemPrompt quand systemPromptGenerator est absent
+   *   ({ appContext, extraRules, actorBlock, actorOptions, gauges, format })
+   * @param {Function} [options.localSimulator] Repli local (sync ou async), reçoit
+   *   { actors, scenario, metrics, currentMetrics, userMessage, history, transcript, targetActorId, plan, signal, turnContext, session }
+   * @param {number} [options.maxTokens] maxOutputTokens, défaut 3072
+   * @param {number} [options.retryMaxTokens] maxOutputTokens du nouvel essai sur réponse tronquée ou invalide (défaut max(8192, maxTokens))
+   * @param {boolean} [options.retrySameModel] Nouvel essai du même modèle avant de changer de modèle (défaut true)
+   * @param {'accept'|'merge'|'local'} [options.onPartial] Aucun modèle n'a rendu de tour complet : 'accept' (défaut) renvoie
+   *   le meilleur tour partiel (_truncated) ; 'merge' le complète avec le simulateur local (acteurs absents) ;
+   *   'local' bascule sur le simulateur (le tour partiel reste dans engine.partialTurn et turn._partialTurn)
+   * @param {string[]} [options.candidateModels] Modèles de repli, défaut FALLBACK_GEMINI_MODELS
+   * @param {number} [options.timeoutMs] Délai maximal d'un appel, défaut 20000 ms
+   * @param {number} [options.temperature] Défaut 0.85
+   * @param {Object} [options.turnSchema] Schéma de tour (défaut CYBER_TURN_SCHEMA)
+   * @param {boolean} [options.useResponseSchema] Envoie toResponseSchema(turnSchema, actors, conversation) (défaut false)
+   * @param {number|Function|Object} [options.thinkingBudget] Nombre, fonction (model) → nombre, ou table par modèle
+   *   (voir resolveThinkingBudget) ; absent : non envoyé
+   * @param {Object} [options.conversation] Options de buildConversationRules ({ playerLabel, speakers, maxSentences, crossTalk, address, peerAddress })
+   * @param {Object} [options.questionPolicy] Instance de createQuestionPolicy (facultative)
+   * @param {boolean} [options.enforcePlan] Applique le plan de questions au tour validé (enforcePlan, défaut true)
+   * @param {boolean} [options.detectQuestionsFromText] Déduit le champ question de la fin du texte (défaut true)
+   * @param {Object} [options.historyAdapter] { isPlayer(msg), speakerOf(msg), replyOf(msg), maxTurns, maxCharsPerEntry,
+   *   includeArbitration, localMessages ('mark' | 'omit' | 'keep'), stripFormulas(text) } pour toTranscript et buildGeminiContents
+   * @param {Function} [options.transcriptFilter] (transcript, history) → transcript : filtre officiel de l'historique normalisé
+   * @param {boolean} [options.normalizeLocal] Normalise la sortie locale au format canonique (défaut true)
+   * @param {boolean} [options.redLineGate] Porte des lignes rouges (défaut true) : si le message du joueur franchit ou teste
+   *   une ligne rouge (profils des acteurs ou familles génériques, voir detectRedLines), aucune variation positive n'est
+   *   gardée ce tour, quel que soit le moteur (Gemini ou local) ; voir applyRedLineGate
+   * @param {Object|false} [options.redLinePenalty] Plafonds négatifs imposés sur ligne rouge franchie ({ trust: -3 }) ;
+   *   défaut : impact des groupes de lignes rouges franchis ; false : aucun plafond
+   * @param {Object} [options.creditLedger] Registre de séance (createCreditLedger) : un énoncé déjà crédité ne rapporte
+   *   plus (diminishingReturns) ; ne pas le passer si le simulateur local applique déjà sa propre dégressivité
+   * @param {number} [options.maxCallsPerTurn] Appels Gemini au plus par tour (défaut 4)
+   * @param {number} [options.maxTruncatedCalls] Réponses tronquées tolérées avant d'accepter le meilleur tour partiel
+   *   sans essayer d'autre modèle (défaut 2 : un seul nouvel essai du même modèle)
+   * @param {boolean} [options.dropEchoes] Retire une réplique Gemini recopiée d'une réplique antérieure (défaut true)
    */
   constructor(options = {}) {
     this.apiKey = options.apiKey
     this.model = options.model || DEFAULT_GEMINI_MODEL
     this.systemPromptGenerator = options.systemPromptGenerator
+    this.promptOptions = isPlainObject(options.promptOptions) ? options.promptOptions : {}
     this.localSimulator = options.localSimulator
     this.candidateModels = options.candidateModels || FALLBACK_GEMINI_MODELS
-    this.maxTokens = options.maxTokens || 2048
+    this.maxTokens = options.maxTokens || 3072
+    this.retryMaxTokens = Number.isFinite(options.retryMaxTokens) ? options.retryMaxTokens : Math.max(8192, this.maxTokens)
+    this.retrySameModel = options.retrySameModel !== false
+    this.onPartial = ['accept', 'merge', 'local'].includes(options.onPartial) ? options.onPartial : 'accept'
     this.timeoutMs = options.timeoutMs ?? GEMINI_REQUEST_TIMEOUT_MS
+    this.temperature = options.temperature ?? 0.85
+    this.turnSchema = options.turnSchema || CYBER_TURN_SCHEMA
+    this.useResponseSchema = !!options.useResponseSchema
+    this.thinkingBudget = Number.isFinite(options.thinkingBudget) || typeof options.thinkingBudget === 'function' || isPlainObject(options.thinkingBudget) ? options.thinkingBudget : undefined
+    this.conversation = isPlainObject(options.conversation) ? options.conversation : {}
+    this.questionPolicy = options.questionPolicy || null
+    this.enforcePlan = options.enforcePlan !== false
+    this.detectQuestionsFromText = options.detectQuestionsFromText !== false
+    this.historyAdapter = isPlainObject(options.historyAdapter) ? options.historyAdapter : {}
+    this.transcriptFilter = typeof options.transcriptFilter === 'function' ? options.transcriptFilter : null
+    this.normalizeLocal = options.normalizeLocal !== false
+    this.redLineGate = options.redLineGate !== false
+    this.redLinePenalty = isPlainObject(options.redLinePenalty) || options.redLinePenalty === false ? options.redLinePenalty : undefined
+    this.creditLedger = options.creditLedger && typeof options.creditLedger.assess === 'function' ? options.creditLedger : null
+    this.maxCallsPerTurn = Number.isFinite(options.maxCallsPerTurn) && options.maxCallsPerTurn > 0 ? options.maxCallsPerTurn : 4
+    this.maxTruncatedCalls = Number.isFinite(options.maxTruncatedCalls) && options.maxTruncatedCalls > 0 ? options.maxTruncatedCalls : 2
+    this.dropEchoes = options.dropEchoes !== false
+    this._turnCtx = null
+    this.partialTurn = null
+    this._actors = null
+    this._plan = null
+    this._planned = false
   }
 
   /**
-   * Extrait le premier objet JSON de la réponse (texte autour, balises markdown, JSON tronqué réparé par jsonrepair).
-   * Lève une erreur si aucun objet JSON n'est récupérable.
+   * Premier objet JSON de la réponse (texte autour, balises markdown, « +5 », tableau de répliques,
+   * JSON tronqué réparé). Lève une erreur si aucun objet JSON n'est récupérable.
    */
   parseGeminiJson(rawText) {
-    return parseJsonObject(rawText)
+    return parseGeminiJson(rawText)
+  }
+
+  /** Comme parseGeminiJson, avec l'indicateur de troncature : { value, truncated }. */
+  parseGeminiJsonDetailed(rawText) {
+    return parseGeminiJsonDetailed(rawText)
+  }
+
+  /** Historique normalisé (toTranscript) avec l'adaptateur du moteur, puis transcriptFilter(transcript, history). */
+  transcriptOf(history, actors = this._actors || []) {
+    const { maxTurns = 6, localMessages, stripFormulas, ...rest } = this.historyAdapter
+    const transcript = toTranscript(history, { actors, maxTurns, ...rest })
+    if (!this.transcriptFilter) return transcript
+    const filtered = this.transcriptFilter(transcript, history)
+    return Array.isArray(filtered) ? filtered : transcript
+  }
+
+  _contentsOptions(userMessage) {
+    const { localMessages, stripFormulas } = this.historyAdapter
+    return { userMessage, ...(localMessages ? { localMessages } : {}), ...(typeof stripFormulas === 'function' ? { stripFormulas } : {}) }
   }
 
   /**
-   * Construit un historique valide pour l'API Gemini (strictement alterné user/model)
+   * Historique valide pour l'API Gemini (strictement alterné user/model), consigne de tour en dernier.
+   * Même signature qu'avant ; corrige le doublon du message joueur, la consigne jamais envoyée et
+   * l'ouverture des acteurs supprimée.
    */
   buildAlternatingContents(history, userMessage) {
-    const contents = []
-    let currentGroupRole = null
-    let currentGroupTexts = []
-
-    const eligibleHistory = (history || []).slice(-12).filter(msg => msg.sender !== 'system' && msg.sender !== 'arbitration')
-
-    eligibleHistory.forEach(msg => {
-      const role = msg.sender === 'user' ? 'user' : 'model'
-      const text = msg.sender === 'user'
-        ? msg.text
-        : `[${msg.actorName || msg.actorId || 'Acteur'} (${msg.actorRole || ''})]: ${msg.text}`
-
-      if (currentGroupRole === null) {
-        currentGroupRole = role
-        currentGroupTexts.push(text)
-      } else if (currentGroupRole === role) {
-        currentGroupTexts.push(text)
-      } else {
-        contents.push({
-          role: currentGroupRole,
-          parts: [{ text: currentGroupTexts.join('\n\n') }]
-        })
-        currentGroupRole = role
-        currentGroupTexts = [text]
-      }
-    })
-
-    if (currentGroupRole !== null && currentGroupTexts.length > 0) {
-      contents.push({
-        role: currentGroupRole,
-        parts: [{ text: currentGroupTexts.join('\n\n') }]
-      })
-    }
-
-    // Le premier message DOIT être 'user'
-    while (contents.length > 0 && contents[0].role !== 'user') {
-      contents.shift()
-    }
-
-    const promptInstruction = `L'utilisateur intervient : "${userMessage}".\nRépondez directement à ses propos ou à ses questions sans jamais répéter les mêmes phrases génériques. Faites réagir 2 à 3 membres du comité selon leurs tempéraments actifs et générez le JSON de réponse.`
-
-    // Le dernier message DOIT être 'user'
-    if (contents.length > 0 && contents[contents.length - 1].role === 'user') {
-      contents[contents.length - 1].parts[0].text += `\n\n[Nouvelle intervention] : ${userMessage}`
-    } else {
-      contents.push({
-        role: 'user',
-        parts: [{ text: promptInstruction }]
-      })
-    }
-
-    return contents
+    const actors = this._actors || []
+    const transcript = this.transcriptOf(history, actors)
+    return buildGeminiContents(transcript, buildTurnDirective({ userMessage, transcript, actors, playerLabel: this.conversation.playerLabel }), this._contentsOptions(userMessage))
   }
 
   /**
-   * Valide la sortie du modèle : objet, répliques exploitables, deltas de jauges bornés.
-   * Renvoie null si la réponse n'est pas exploitable.
+   * Valide la sortie du modèle avec this.turnSchema (validateTurnWith). Renvoie null si aucune réplique.
+   * options : { truncated, targetActorId, detectFromText } ; les actorId sont vérifiés contre les acteurs du tour en cours.
    */
-  validateTurn(parsed) {
-    if (!isPlainObject(parsed)) return null
-    const dialogues = (Array.isArray(parsed.dialogues) ? parsed.dialogues : [])
-      .filter((d) => isPlainObject(d) && typeof d.text === 'string' && d.text.trim())
-    if (!dialogues.length) return null
-    const normalizeDelta = (val) => {
-      const n = typeof val === 'number' ? val : typeof val === 'string' && val.trim() ? Number(val) : NaN
-      if (!Number.isFinite(n)) return 0
-      return Math.max(-20, Math.min(20, Math.round(n)))
-    }
-    const impact = isPlainObject(parsed.metricsImpact) ? parsed.metricsImpact : {}
-    return {
-      ...parsed,
-      dialogues,
-      metricsImpact: {
-        security: normalizeDelta(impact.security),
-        compliance: normalizeDelta(impact.compliance),
-        trust: normalizeDelta(impact.trust),
-        teamClimate: normalizeDelta(impact.teamClimate)
-      }
-    }
+  validateTurn(parsed, options = {}) {
+    return validateTurnWith(this.turnSchema, parsed, { actors: this._actors || undefined, detectFromText: this.detectQuestionsFromText, ...options })
   }
 
+  _decorateLocal(res, lastError, args) {
+    let turn = isPlainObject(res) ? res : null
+    if (turn && this.normalizeLocal) {
+      turn = validateTurnWith(this.turnSchema, turn, { actors: Array.isArray(args?.actors) && args.actors.length ? args.actors : undefined, targetActorId: args?.targetActorId }) || turn
+    }
+    if (!turn) {
+      turn = {
+        dialogues: [],
+        metricsImpact: Object.fromEntries(Object.keys(this.turnSchema.gauges).map((k) => [k, 0])),
+        summary: ''
+      }
+      if (!lastError) lastError = new Error(typeof this.localSimulator === 'function' ? 'Le simulateur local n\'a renvoyé aucun tour' : 'Aucun simulateur local configuré')
+    }
+    turn._engineFallback = true
+    if (lastError) turn._engineError = lastError
+    if (args && args._fallback) {
+      turn._fallbackReason = args._fallback.reason
+      turn._fallbackDetail = args._fallback.detail
+    }
+    return turn
+  }
+
+  /** Tour local synchrone (API historique). Un simulateur absent ou en erreur donne un tour vide avec _engineError. */
   localTurn(args, lastError = null) {
-    const res = this.localSimulator(args) || {}
-    res._engineFallback = true
-    if (lastError) res._engineError = lastError
-    return res
+    let res = null
+    let err = lastError
+    if (typeof this.localSimulator === 'function') {
+      try { res = this.localSimulator(args) } catch (e) { err = lastError || e }
+    }
+    if (res && typeof res.then === 'function') {
+      // Simulateur asynchrone appelé par l'API synchrone : utiliser playTurn
+      return this._decorateLocal(null, err || new Error('Simulateur local asynchrone : appeler playTurn'), args)
+    }
+    return this._decorateLocal(res, err, args)
+  }
+
+  async _localTurnAsync(args, lastError = null) {
+    let res = null
+    let err = lastError
+    if (typeof this.localSimulator === 'function') {
+      try { res = await this.localSimulator(args) } catch (e) { err = lastError || e }
+    }
+    return this._decorateLocal(res, err, args)
+  }
+
+  _record(turn) {
+    if (turn && this.enforcePlan && Array.isArray(turn.dialogues) && turn.dialogues.length) {
+      try { enforcePlan(turn, this._planned ? this._plan : null) } catch (e) { /* jamais bloquant */ }
+    }
+    const ctx = this._turnCtx
+    if (turn && ctx && isNonEmptyString(ctx.userMessage)) {
+      // Porte des lignes rouges : aucune variation positive quand une ligne rouge est franchie ou testée
+      if (this.redLineGate) {
+        try { applyRedLineGate(turn, { userMessage: ctx.userMessage, actors: ctx.actors, penalty: this.redLinePenalty }) } catch (e) { /* jamais bloquant */ }
+      }
+      // Dégressivité : un énoncé déjà crédité ne rapporte plus
+      if (this.creditLedger) {
+        try {
+          const key = isPlainObject(turn.metricsImpact) ? 'metricsImpact' : isPlainObject(turn.metricsDelta) ? 'metricsDelta' : null
+          if (key) {
+            const dr = diminishingReturns(this.creditLedger, ctx.userMessage)
+            if (dr.factor < 1) {
+              const before = turn[key]
+              turn[key] = applyDiminishingReturns(before, dr.factor)
+              if (JSON.stringify(before) !== JSON.stringify(turn[key])) turn._diminished = { factor: dr.factor, repeated: dr.repeated }
+            }
+            if (Object.values(turn[key]).some((v) => typeof v === 'number' && v > 0)) this.creditLedger.record(ctx.userMessage)
+          }
+        } catch (e) { /* jamais bloquant */ }
+      }
+    }
+    if (turn && this.questionPolicy && typeof this.questionPolicy.recordTurn === 'function') {
+      try { this.questionPolicy.recordTurn(turn) } catch (e) { /* la politique ne doit jamais bloquer un tour */ }
+    }
+    return turn
+  }
+
+  /** Retire les répliques recopiées d'une réplique antérieure (similarité ≥ 0.8), en gardant au moins une réplique. */
+  _dropEchoes(turn, transcript) {
+    const previous = (Array.isArray(transcript) ? transcript : []).filter((e) => e?.kind === 'actor' && isNonEmptyString(e.text)).map((e) => e.text)
+    if (!previous.length || !Array.isArray(turn?.dialogues) || turn.dialogues.length < 2) return
+    const kept = turn.dialogues.filter((d) => !previous.some((p) => similarity(d.text, p) >= 0.8))
+    if (kept.length && kept.length < turn.dialogues.length) {
+      turn._warnings = [...(Array.isArray(turn._warnings) ? turn._warnings : []), `${turn.dialogues.length - kept.length} réplique(s) recopiée(s) d'un tour précédent retirée(s)`]
+      turn.dialogues = kept
+    }
+  }
+
+  _payloadFor(basePayload, model, { maxTokens, noThinking = false } = {}) {
+    const generationConfig = { ...basePayload.generationConfig }
+    if (Number.isFinite(maxTokens)) generationConfig.maxOutputTokens = maxTokens
+    let budget = resolveThinkingBudget(this.thinkingBudget, model)
+    if (noThinking && canDisableThinking(model)) budget = 0
+    if (budget !== undefined) generationConfig.thinkingConfig = { thinkingBudget: budget }
+    return { ...basePayload, generationConfig }
+  }
+
+  /** Session du tour pour le prompt : { turn, decisionTitle } (scenario.session prioritaire, sinon déduite de l'historique). */
+  sessionOf(scenario, transcript, history, userMessage) {
+    const given = isPlainObject(scenario?.session) ? scenario.session : {}
+    const players = (Array.isArray(history) ? history : []).filter((m) => isPlainObject(m) && (m.sender === 'user' || m.sender === 'player' || m.sender === 'decision') && isNonEmptyString(m.text))
+    const last = players[players.length - 1]
+    const already = last && isNonEmptyString(userMessage) && normalize(last.text) === normalize(userMessage)
+    const turn = Number.isFinite(given.turn) ? given.turn : players.length + (isNonEmptyString(userMessage) && !already ? 1 : 0)
+    let decisionTitle = isNonEmptyString(given.decisionTitle) ? given.decisionTitle : null
+    if (!decisionTitle) {
+      const decision = [...(Array.isArray(transcript) ? transcript : [])].reverse().find((e) => e?.kind === 'decision')
+      if (decision) decisionTitle = String(decision.text).split('\n')[0].replace(/^\s*📋\s*(?:\[[^\]]*\]\s*:\s*)?/u, '').trim() || null
+    }
+    return { ...given, turn, decisionTitle }
   }
 
   /**
-   * Joue un tour de War Room en tentant Gemini d'abord, puis le simulateur local.
+   * Joue un tour : Gemini d'abord, simulateur local ensuite. Renvoie toujours un tour au format canonique
+   * { dialogues, metricsImpact, summary, _engineUsedModel? | _engineFallback?, _engineError?, _fallbackReason?,
+   *   _fallbackDetail?, _truncated?, _warnings?, _planViolations?, _partialTurn? }.
+   * - targetActorId : acteur ciblé (validé contre actors) : il parle en premier ;
+   * - turnContext : { replyTo, pending, answeredNow, engagements, extraLines, avoidPhrases, ledger, analysis, … } propre
+   *   à l'application : transmis à la politique de questions, à la consigne de tour, au prompt (ctx.turnContext) et au
+   *   simulateur local ;
+   * - signal : AbortSignal ; une annulation lève une AbortError (pas de repli local) ;
+   * - la construction du prompt est protégée : une exception bascule sur le simulateur local ;
+   * - réponse tronquée ou JSON invalide : UN nouvel essai du même modèle avec retryMaxTokens (et sans raisonnement
+   *   si le modèle le permet), puis modèle suivant ; au plus maxCallsPerTurn appels ; après maxTruncatedCalls réponses
+   *   tronquées, le meilleur tour partiel est accepté (onPartial) sans essayer d'autre modèle ;
+   * - porte des lignes rouges (redLineGate) et dégressivité (creditLedger) appliquées au tour final, Gemini ou local ;
+   * - 401/403 et 400 API_KEY_INVALID arrêtent le repli multi-modèles, les autres erreurs essaient le modèle suivant.
    */
-  async playTurn({ actors, scenario, metrics, userMessage, history } = {}) {
-    const args = { actors, scenario, metrics, userMessage, history }
+  async playTurn({ actors, scenario, metrics, userMessage, history, targetActorId = null, signal, turnContext = null } = {}) {
+    const actorList = Array.isArray(actors) ? actors.filter((a) => isPlainObject(a) && isNonEmptyString(a.id)) : []
+    this._actors = actorList.length ? actorList : null
+    this._turnCtx = { userMessage: typeof userMessage === 'string' ? userMessage : '', actors: actorList }
+    this.partialTurn = null
+    const target = targetActorId && actorList.some((a) => a.id === targetActorId) ? targetActorId : null
+    const tc = isPlainObject(turnContext) ? turnContext : {}
+    let transcript = []
+    try { transcript = this.transcriptOf(history, actorList) } catch (e) { transcript = [] }
+    let plan = null
+    this._planned = false
+    if (this.questionPolicy && typeof this.questionPolicy.plan === 'function') {
+      try {
+        plan = this.questionPolicy.plan({ ...tc, scenario, userMessage, actors: actorList, transcript, targetActorId: target })
+        this._planned = !!plan
+      } catch (e) { plan = null }
+    }
+    this._plan = plan
+    const session = this.sessionOf(scenario, transcript, history, userMessage)
+    const args = { actors, scenario, metrics, currentMetrics: metrics, userMessage, history, transcript, targetActorId: target, plan, signal, turnContext: tc, session }
+    if (signal?.aborted) throw abortError()
+
     const apiKey = cleanApiKey(this.apiKey)
-    if (!apiKey) return this.localTurn(args)
+    if (!apiKey) return this._record(await this._localTurnAsync({ ...args, _fallback: { reason: 'nokey', detail: null } }))
 
-    const systemPrompt = this.systemPromptGenerator(actors, scenario, metrics)
-    const contents = this.buildAlternatingContents(history, userMessage)
-
-    const payload = {
-      systemInstruction: { parts: [{ text: systemPrompt }] },
-      contents,
-      generationConfig: {
-        responseMimeType: "application/json",
-        temperature: 0.85,
-        maxOutputTokens: this.maxTokens
+    let basePayload
+    try {
+      const ctx = { plan, transcript, targetActorId: target, schema: this.turnSchema, conversation: this.conversation, userMessage, history, session, turnContext: tc }
+      const systemPrompt = typeof this.systemPromptGenerator === 'function'
+        ? this.systemPromptGenerator(actors, scenario, metrics, ctx)
+        : buildWarRoomSystemPrompt({ ...this.promptOptions, scenario, metrics, actors: actorList, conversation: this.conversation, schema: this.turnSchema })
+      if (!isNonEmptyString(systemPrompt)) throw new Error('Prompt système vide')
+      const directive = buildTurnDirective({
+        userMessage, transcript, actors: actorList, plan, targetActorId: target, playerLabel: this.conversation.playerLabel,
+        replyTo: tc.replyTo || null, pending: tc.pending, answeredNow: tc.answeredNow, engagements: tc.engagements,
+        extraLines: tc.extraLines, avoidPhrases: tc.avoidPhrases
+      })
+      const generationConfig = { responseMimeType: 'application/json', temperature: this.temperature, maxOutputTokens: this.maxTokens }
+      if (this.useResponseSchema) generationConfig.responseSchema = toResponseSchema(this.turnSchema, actorList, this.conversation)
+      basePayload = {
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents: buildGeminiContents(transcript, directive, this._contentsOptions(userMessage)),
+        generationConfig
       }
+    } catch (err) {
+      console.warn('[WarRoomEngine] Construction du prompt impossible, bascule locale :', err?.message)
+      return this._record(await this._localTurnAsync({ ...args, _fallback: { reason: 'error', detail: null } }, err))
     }
 
     let lastError = null
-    for (const mName of modelsToTry(this.model, this.candidateModels)) {
-      try {
-        const response = await geminiFetch(`models/${mName}:generateContent`, apiKey, { body: payload, timeoutMs: this.timeoutMs })
-        if (!response.ok) {
-          lastError = await httpError(response, mName)
-          if (FATAL_HTTP_STATUSES.has(response.status)) break
-          continue
+    let fatal = false
+    let partialModel = null
+    let calls = 0
+    let truncatedCalls = 0
+    models: for (const mName of modelsToTry(this.model, this.candidateModels)) {
+      if (signal?.aborted) throw abortError()
+      const partialBefore = this.partialTurn
+      // Un seul nouvel essai par modèle (réponse tronquée ou invalide)
+      const attempts = this.retrySameModel ? 2 : 1
+      for (let attempt = 0; attempt < attempts; attempt++) {
+        if (signal?.aborted) throw abortError()
+        if (calls >= this.maxCallsPerTurn) break models
+        calls++
+        const retry = attempt > 0
+        const payload = this._payloadFor(basePayload, mName, retry ? { maxTokens: Math.max(this.retryMaxTokens, this.maxTokens), noThinking: true } : {})
+        let retryable = false
+        try {
+          const response = await geminiFetch(`models/${mName}:generateContent`, apiKey, { body: payload, timeoutMs: this.timeoutMs, signal })
+          if (!response.ok) {
+            lastError = await httpError(response, mName)
+            fatal = isFatalGeminiError(lastError)
+            break
+          }
+          const data = await response.json()
+          const { text, error, finishReason } = candidateText(data, mName)
+          if (error) {
+            lastError = error
+            error.invalidOutput = true
+            retryable = finishReason === 'MAX_TOKENS'
+          } else {
+            let parsed
+            try { parsed = parseGeminiJsonDetailed(text) } catch (parseErr) {
+              parseErr.invalidOutput = true
+              parseErr.model = mName
+              throw parseErr
+            }
+            const truncated = parsed.truncated || finishReason === 'MAX_TOKENS'
+            const turn = this.validateTurn(parsed.value, { truncated, targetActorId: target })
+            if (!turn) {
+              lastError = new Error(`Réponse Gemini sans réplique exploitable sur modèle ${mName}`)
+              lastError.invalidOutput = true
+              retryable = true
+            } else if (truncated) {
+              truncatedCalls++
+              turn._engineUsedModel = mName
+              if (!this.partialTurn || turn.dialogues.length > this.partialTurn.dialogues.length) this.partialTurn = turn
+              lastError = new Error(`Réponse Gemini tronquée sur modèle ${mName}`)
+              lastError.invalidOutput = true
+              retryable = true
+            } else {
+              turn._engineUsedModel = mName
+              if (retry) turn._retried = true
+              if (this.dropEchoes) this._dropEchoes(turn, transcript)
+              return this._record(turn)
+            }
+          }
+        } catch (netErr) {
+          if (signal?.aborted) throw abortError()
+          lastError = netErr
+          retryable = !!netErr?.invalidOutput
         }
-        const data = await response.json()
-        const { text, error } = candidateText(data, mName)
-        if (error) { lastError = error; continue }
-        const turn = this.validateTurn(this.parseGeminiJson(text))
-        if (!turn) {
-          lastError = new Error(`Réponse Gemini sans réplique exploitable sur modèle ${mName}`)
-          continue
-        }
-        turn._engineUsedModel = mName
-        return turn
-      } catch (netErr) {
-        lastError = netErr
+        if (!retryable) break
       }
+      // Tour partiel retenu par ce modèle (ici ou par une sous-classe qui surcharge validateTurn)
+      if (this.partialTurn && this.partialTurn !== partialBefore) partialModel = mName
+      if (fatal) break
+      // Réponses tronquées répétées : le meilleur tour partiel est accepté sans multiplier les appels
+      if (this.partialTurn && truncatedCalls >= this.maxTruncatedCalls) break
     }
 
-    console.warn(`[WarRoomEngine] Tous les appels Gemini ont échoué, bascule locale. Dernière erreur:`, lastError?.message)
-    return this.localTurn(args, lastError)
+    const fallback = fallbackReasonOf(lastError)
+    if (this.partialTurn && this.onPartial !== 'local') {
+      const partial = this.partialTurn
+      if (this.onPartial === 'merge') {
+        const local = await this._localTurnAsync({ ...args, _fallback: fallback }, lastError)
+        const have = new Set(partial.dialogues.map((d) => d.actorId))
+        const extra = asList(local.dialogues).filter((d) => !have.has(d.actorId))
+        partial.dialogues = [...partial.dialogues, ...extra].slice(0, this.turnSchema.maxDialogues)
+        if (!isNonEmptyString(partial.summary) && isNonEmptyString(local.summary)) partial.summary = local.summary
+        partial._mergedLocal = extra.length > 0
+      }
+      partial._truncated = true
+      if (!partial._engineUsedModel && partialModel) partial._engineUsedModel = partialModel
+      if (this.dropEchoes) this._dropEchoes(partial, transcript)
+      return this._record(partial)
+    }
+    console.warn('[WarRoomEngine] Tous les appels Gemini ont échoué, bascule locale. Dernière erreur :', lastError?.message)
+    const local = await this._localTurnAsync({ ...args, _fallback: fallback }, lastError)
+    if (this.partialTurn) local._partialTurn = this.partialTurn
+    return this._record(local)
   }
 }
 
+const asList = (v) => (Array.isArray(v) ? v : [])
+
+/** Modèles Gemini disponibles ([] en cas d'erreur, comportement historique). Voir listGeminiModels pour les options. */
 export async function fetchAvailableGeminiModels(apiKey) {
   const key = cleanApiKey(apiKey)
   if (!key) return []
@@ -321,20 +634,31 @@ export async function fetchAvailableGeminiModels(apiKey) {
   return []
 }
 
+/**
+ * Teste une clé : liste les modèles puis appelle le modèle demandé (ou le premier disponible).
+ * Renvoie { success, models, testedModel, requestedModel, requestedFound }. Lève le vrai message de l'API
+ * en cas de clé refusée (401/403, 400 API_KEY_INVALID).
+ */
 export async function testGeminiApiKey(apiKey, requestedModel = null) {
   const key = cleanApiKey(apiKey)
   if (!key) {
     throw new Error('Clé API requise')
   }
 
-  const models = await fetchAvailableGeminiModels(key)
+  let models = []
+  try {
+    models = await listGeminiModels(key, { throwOnError: true })
+  } catch (err) {
+    if (isFatalGeminiError(err) || err?.status === 400) throw new Error(err.message || `Clé API refusée (${err.status})`)
+    models = []
+  }
   if (!models || models.length === 0) {
     throw new Error('Aucun modèle de génération compatible détecté pour cette clé API')
   }
 
   const cleanRequested = cleanModelName(requestedModel)
-  const validModelObj = models.find(m => m.id === cleanRequested) || models[0]
-  const validModel = validModelObj.id
+  const requestedObj = cleanRequested ? models.find(m => m.id === cleanRequested) : null
+  const validModel = (requestedObj || models[0]).id
 
   const response = await geminiFetch(`models/${validModel}:generateContent`, key, {
     body: { contents: [{ role: 'user', parts: [{ text: 'OK' }] }] }
@@ -345,15 +669,7 @@ export async function testGeminiApiKey(apiKey, requestedModel = null) {
     throw new Error(err.error?.message || `Erreur de connexion API (${response.status})`)
   }
 
-  return { success: true, models, testedModel: validModel }
-}
-
-/**
- * Premier objet JSON d'une réponse de modèle (texte autour toléré, JSON tronqué réparé).
- * Lève une erreur si aucun objet n'est récupérable (prose, nombre seul…).
- */
-export function parseGeminiJson(rawText) {
-  return parseJsonObject(rawText)
+  return { success: true, models, testedModel: validModel, requestedModel: cleanRequested || null, requestedFound: !!requestedObj }
 }
 
 
@@ -370,6 +686,15 @@ const LEARNER_TAG = 'reponse_apprenant'
 function neutralizeLearnerText(text) {
   return String(text).replace(/[<\uff1c\ufe64\u2329\u27e8\u3008](\s*\/?\s*)([^<>\uff1c\uff1e]{0,80})/g, (match, slash, rest) =>
     normalize(rest).replace(/[^a-z]/g, '').startsWith(LEARNER_TAG.replace(/_/g, '')) ? `‹${slash}${rest}` : match)
+}
+
+// Ajoute une question à une réaction, à l'intérieur des guillemets s'il y en a (« … Qui signe ? »)
+function appendQuoted(reaction, question) {
+  const r = String(reaction || '').trim()
+  const q = String(question || '').trim()
+  if (!q || normalize(r).includes(normalize(q).replace(/[?\s]+$/, ''))) return r
+  const m = r.match(/^(.*?)(\s*[»"”])$/s)
+  return m ? `${appendQuestion(m[1], q)}${m[2].startsWith(' ') ? m[2] : `\u00a0${m[2].trim()}`}` : appendQuestion(r, q)
 }
 
 const gradeFor = (score) => (score >= 80 ? 'A' : score >= 60 ? 'B' : score >= 40 ? 'C' : 'D')
@@ -402,11 +727,15 @@ const EVALUATION_SCHEMA = {
       type: 'OBJECT',
       properties: { text: { type: 'STRING' } },
       required: ['text']
-    }
+    },
+    followUpQuestion: { type: 'STRING', nullable: true, description: 'Si la note est inférieure à 75 : question précise du décideur, qui termine sa réaction ; sinon null' }
   },
   required: ['score', 'grade', 'feedback', 'stakeholderReaction'],
-  propertyOrdering: ['score', 'grade', 'feedback', 'stakeholderReaction']
+  propertyOrdering: ['score', 'grade', 'feedback', 'stakeholderReaction', 'followUpQuestion']
 }
+
+/** Note en dessous de laquelle le décideur termine sa réaction par une question précise. */
+export const FOLLOW_UP_SCORE_THRESHOLD = 75
 
 const WORD = /[\p{L}\p{N}€%]+/gu
 
@@ -473,7 +802,7 @@ function feedbackStrings(value) {
  * caseStudy (champs communs aux deux applications, tous optionnels sauf le texte de référence) :
  *   context, technicalFact, decisionQuestion (ou boardQuestion), idealAnswer (ou suggestedPitch),
  *   mustConvey: TermGroup[]  faits à transmettre (négation prise en compte),
- *   pitfalls: TermGroup[]  affirmations à proscrire (une occurrence niée ne compte pas, sauf negatable: false),
+ *   pitfalls: TermGroup[]  affirmations à proscrire (une occurrence niée ne compte pas, sauf groupe negatable: false),
  *   jargonWords, businessWords, actionWords, keywordsToInclude: string[]
  * stakeholder : acteur de data/actors.js avec son profile (voir services/stakeholderProfile.js)
  *
@@ -536,7 +865,8 @@ export class TechToBoardEngine {
       feedback.push(`Concepts clés couverts : ${matched} / ${keywords.length}.`)
     }
 
-    // 3. Faits à transmettre (occurrences niées exclues) et affirmations à proscrire (toute occurrence)
+    // 3. Faits à transmettre et affirmations à proscrire (occurrences niées exclues dans les deux cas,
+    //    sauf groupe negatable: false)
     const convey = matchTermGroups(raw, asGroups(cs.mustConvey), { negatable: true })
     score += Math.min(SCORE.conveyMax, convey.met.length * SCORE.conveyEach)
     if (convey.missed.length) feedback.push(`💡 Il manque : ${convey.missed.join(', ')}.`)
@@ -599,6 +929,14 @@ export class TechToBoardEngine {
     if (caps.length) score = Math.min(score, ...caps)
     if (breachCount) score = Math.min(score, SCORE.breachCap)
 
+    // Note insuffisante : question précise du décideur, prise dans son profil (attente manquante ou ligne rouge)
+    let followUpQuestion = null
+    if (score < FOLLOW_UP_SCORE_THRESHOLD && actor) {
+      const redGroup = asGroups(actor.profile?.redLines).find((g) => assessment?.redLinesCrossed?.includes(g.label) && typeof g.question === 'string' && g.question.trim())
+      const expGroup = asGroups(actor.profile?.expectations).find((g) => assessment?.expectationsMissed?.includes(g.label) && typeof g.question === 'string' && g.question.trim())
+      followUpQuestion = (redGroup || expGroup)?.question.trim() || null
+    }
+    const reaction = this.localReaction(score, cs, actor, breaches, assessment, breachCount)
     return {
       score,
       rawScore,
@@ -607,7 +945,10 @@ export class TechToBoardEngine {
       breaches,
       breachFeedback,
       breachCount,
-      stakeholderReaction: { text: this.localReaction(score, cs, actor, breaches, assessment, breachCount) },
+      // Plafonds de structure (réponse trop courte, liste de mots-clés) : appliqués aussi à la note Gemini
+      caps,
+      stakeholderReaction: { text: followUpQuestion ? appendQuoted(reaction, followUpQuestion) : reaction },
+      followUpQuestion,
       dgReaction: "Merci pour ce point, nous allons l'analyser.",
       _engineFallback: true
     }
@@ -639,6 +980,8 @@ export class TechToBoardEngine {
     let score = clampScore(rawScore)
     const guardrail = local?.breachCount > 0 || local?.breaches?.length > 0
     if (guardrail) score = Math.min(score, SCORE.breachCap)
+    const caps = Array.isArray(local?.caps) ? local.caps.filter((c) => Number.isFinite(c)) : []
+    if (caps.length) score = Math.min(score, ...caps)
 
     const geminiFeedback = feedbackStrings(parsed.feedback)
     const breachLines = guardrail ? (local.breachFeedback?.length ? local.breachFeedback : ['⚠️ Une affirmation à proscrire a été détectée.']) : []
@@ -647,7 +990,14 @@ export class TechToBoardEngine {
     const reaction = typeof parsed.stakeholderReaction === 'string' ? parsed.stakeholderReaction
       : typeof parsed.stakeholderReaction?.text === 'string' ? parsed.stakeholderReaction.text : ''
     // Une réaction enthousiaste n'a pas de sens si le garde-fou a plafonné la note
-    const reactionText = !guardrail && reaction.trim() ? reaction.trim() : local.stakeholderReaction.text
+    let reactionText = !guardrail && reaction.trim() ? reaction.trim() : local.stakeholderReaction.text
+    // Note insuffisante : la réaction se termine par une question précise (followUpQuestion du modèle, sinon locale)
+    let followUpQuestion = null
+    if (score < FOLLOW_UP_SCORE_THRESHOLD) {
+      const given = typeof parsed.followUpQuestion === 'string' && parsed.followUpQuestion.trim() && !/^null$/i.test(parsed.followUpQuestion.trim()) ? parsed.followUpQuestion.trim() : null
+      followUpQuestion = given && /\?\s*[»"”]?\s*$/.test(given) ? given : local?.followUpQuestion || null
+      if (followUpQuestion) reactionText = appendQuoted(reactionText, followUpQuestion)
+    }
 
     return {
       score,
@@ -655,10 +1005,11 @@ export class TechToBoardEngine {
       grade: gradeFor(score),
       feedback,
       stakeholderReaction: { text: reactionText },
+      followUpQuestion,
       dgReaction: typeof parsed.dgReaction === 'string' && parsed.dgReaction.trim() && !guardrail ? parsed.dgReaction.trim() : reactionText,
       breaches: local.breaches || [],
       _localScore: local.score,
-      _guardrailApplied: guardrail && clampScore(rawScore) > score
+      _guardrailApplied: (guardrail || caps.length > 0) && clampScore(rawScore) > score
     }
   }
 
@@ -683,12 +1034,15 @@ Règles de notation :
 - Valorise : faits exacts, impact métier chiffré, niveau de confiance explicite, recommandation actionnable (décision, délai, arbitrage demandé), réponse aux enjeux et attentes du décideur.
 - Sanctionne : affirmations à proscrire listées, franchissement des lignes rouges du décideur, promesses non tenables, jargon non expliqué pour un non-technicien, liste de mots-clés sans phrases rédigées.
 
+Réaction du décideur : parlée, crédible, dans son registre. Si la note est inférieure à ${FOLLOW_UP_SCORE_THRESHOLD}, elle se termine par UNE question précise (chiffre, délai, responsable ou condition) sur ce qui manque le plus, recopiée dans followUpQuestion ; sinon followUpQuestion vaut null.
+
 Réponds UNIQUEMENT par un objet JSON valide (sans markdown) :
 {
   "score": <entier de 0 à 100>,
   "grade": "<A, B, C ou D>",
   "feedback": ["<point fort>", "<point d'amélioration>", "<conseil sur la formulation pour ce décideur>"],
-  "stakeholderReaction": { "text": "<réaction parlée, crédible, de ce décideur à cette réponse>" }
+  "stakeholderReaction": { "text": "<réaction parlée, crédible, de ce décideur à cette réponse>" },
+  "followUpQuestion": "<question précise qui termine la réaction>" | null
 }`
 
     const userPrompt = `
@@ -724,13 +1078,13 @@ ${neutralizeLearnerText(text)}
         const response = await geminiFetch(`models/${mName}:generateContent`, apiKey, { body: payload, timeoutMs: this.timeoutMs })
         if (!response.ok) {
           lastError = await httpError(response, mName)
-          if (FATAL_HTTP_STATUSES.has(response.status)) break
+          if (isFatalGeminiError(lastError)) break
           continue
         }
         const data = await response.json()
         const { text: rawText, error } = candidateText(data, mName)
         if (error) { lastError = error; continue }
-        const result = this.validateGeminiEvaluation(parseJsonObject(rawText), local)
+        const result = this.validateGeminiEvaluation(parseGeminiJson(rawText), local)
         if (!result) {
           lastError = new Error(`Évaluation Gemini inexploitable (note absente ou non numérique) sur modèle ${mName}`)
           continue
@@ -748,4 +1102,3 @@ ${neutralizeLearnerText(text)}
   }
 }
 
-export { default, default as nexusPreset, default as nexusVisualsPreset, default as cyberVisualsPreset, nexusLibsContent, cyberLibsContent } from './tailwind.preset.js'
